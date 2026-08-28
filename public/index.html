@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>博弈场 · 多人公网版</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #101418;
+    color: #e8e8e8;
+    margin: 0;
+    padding: 16px;
+  }
+  h1, h2, h3 { margin: 0 0 12px; }
+  .container { max-width: 960px; margin: 0 auto; }
+  .panel {
+    background: #1c222b;
+    border: 1px solid #2c3644;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .hidden { display: none !important; }
+  input, select {
+    background: #11161d;
+    border: 1px solid #344151;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 15px;
+    margin: 4px 0;
+  }
+  input { width: 220px; }
+  button {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 15px;
+    cursor: pointer;
+    margin: 6px 6px 0 0;
+  }
+  button:hover { background: #2563eb; }
+  button.secondary { background: #374151; }
+  button.secondary:hover { background: #4b5563; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .event-name { font-size: 22px; font-weight: bold; color: #fbbf24; }
+  .rule { white-space: pre-line; background: #11161d; padding: 12px; border-radius: 8px; line-height: 1.6; }
+  .phase { color: #9ca3af; font-size: 14px; margin-bottom: 6px; }
+  .scoreboard { display: flex; gap: 10px; flex-wrap: wrap; }
+  .score { background: #26303c; border-radius: 8px; padding: 8px 14px; min-width: 90px; text-align: center; }
+  .score .name { font-size: 13px; color: #9fb2c7; }
+  .score .pts { font-size: 22px; font-weight: bold; margin-top: 2px; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .action-card {
+    background: #26303c;
+    border: 1px solid #3b4a5c;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .action-card:hover { background: #324050; border-color: #5b7a9c; }
+  .chat-box { max-height: 180px; overflow-y: auto; background: #11161d; padding: 10px; border-radius: 8px; margin-top: 8px; }
+  .chat-input-row { display: flex; gap: 8px; margin-top: 8px; }
+  .chat-input-row input { flex: 1; }
+  .warn { color: #fca5a5; }
+  .link { color: #9ca3af; font-size: 13px; }
+  .result-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #2c3644; }
+  .result-row .name { min-width: 100px; font-weight: bold; }
+  .result-row .delta { min-width: 70px; color: #34d399; }
+  .result-row .delta.neg { color: #f87171; }
+    .container { max-width: 1200px; }
+    body {
+      background: radial-gradient(circle at 50% 30%, #1f2a22, #0b0f0c 70%);
+    }
+    .panel {
+      background: rgba(20, 28, 24, 0.92);
+      border: 1px solid #3f4f3a;
+      box-shadow: 0 6px 18px rgba(0,0,0,.45);
+    }
+    .container.in-game {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 14px;
+      align-items: start;
+    }
+    .container.in-game > h1 { grid-column: 1 / 3; }
+    .container.in-game > #game { grid-column: 1; grid-row: 2; }
+    .container.in-game > #scorePanel { grid-column: 1; grid-row: 3; }
+    .container.in-game > #chatPanel { grid-column: 2; grid-row: 2 / 4; }
+    #game {
+      min-height: 420px;
+      background: #14231a;
+      border: 8px solid #5a3a20;
+      border-radius: 28px;
+      position: relative;
+    }
+    #eventName {
+      font-family: "STKaiti", "KaiTi", "Microsoft YaHei", serif;
+      font-size: 34px;
+      color: #f6d67a;
+      text-shadow: 0 2px 4px #000;
+      text-align: center;
+      margin: 8px 0 6px;
+    }
+    #eventRule {
+      background: linear-gradient(180deg, #f7e8c1, #e2c58b);
+      color: #3e2a12;
+      border: 2px solid #b3924f;
+      box-shadow: inset 0 0 8px #8a6a2c;
+      font-family: "STKaiti", "KaiTi", "Microsoft YaHei", serif;
+    }
+    .score {
+      background: radial-gradient(circle, #f7de9c, #c9a24f);
+      color: #2a1b0a;
+      border: 2px solid #8a6a2c;
+      border-radius: 50%;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      min-width: 0;
+    }
+    .score .name { color: #3e2a12; font-size: 13px; }
+    .score .pts { font-size: 20px; font-weight: bold; }
+    .action-card {
+      background: linear-gradient(#8e2b2b, #571b1b);
+      border: 2px solid #d9a75f;
+      color: #ffe9a8;
+      box-shadow: 0 4px 10px rgba(0,0,0,.4);
+      font-family: "STKaiti", "KaiTi", "Microsoft YaHei", serif;
+    }
+    .action-card:hover { background: linear-gradient(#a33, #6a2020); border-color: #ffcf7a; }
+    .chat-box { max-height: 300px; }
+    .panel h3 { color: #d9a75f; }
+    .container.in-game {
+      position: relative;
+      max-width: 1500px;
+    }
+    #game {
+      min-height: 740px;
+        z-index: 1;
+      padding: 90px 80px;
+    }
+    #scorePanel {
+      position: absolute;
+      inset: 45px 45px 45px 45px;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      pointer-events: none;
+      z-index: 5;
+      margin: 0;
+      overflow: visible;
+    }
+    #scoreboard {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .score {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      transition: left 1s ease, top 1s ease;
+    }
+    #eventName {
+      font-size: 28px;
+    }
+    #eventRule {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    #gameBody {
+      margin-top: 24px;
+      text-align: center;
+    }
+    .actions {
+      justify-content: center;
+      margin-top: 18px;
+    }
+    .action-card {
+      min-width: 120px;
+      text-align: center;
+    }
+
+  #playerList { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  #playerList > div {
+    background: #26303c;
+    border: 1px solid #3b4a5c;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+    #eventName, #eventRule, #gameBody {
+      position: relative;
+      z-index: 10;
+    }
+
+
+</style>
+
+
+</head>
+<body>
+<div class="container">
+  <h1>博弈场 · 多人公网版</h1>
+  <p class="link">每个玩家使用自己的设备访问同一个网址。</p>
+
+  <!-- 首页 -->
+  <div id="landing" class="panel">
+      <h2>进入游戏</h2>
+    <div class="row">
+      <input id="nameInput" placeholder="你的昵称" value="" maxlength="12">
+    </div>
+    <div class="row">
+      <button onclick="createRoom()">创建房间</button>
+      <button class="secondary" onclick="joinRoom()">加入房间</button>
+      <input id="roomInput" placeholder="房间码" maxlength="6" style="width:120px;">
+    </div>
+    <p class="link" id="statusText"></p>
+  </div>
+
+  <!-- 大厅 -->
+  <div id="lobby" class="panel hidden">
+    <h2>大厅</h2>
+    <div class="row">
+      <div>房间码：<b id="roomCode"></b></div>
+      <button id="copyBtn" class="secondary" onclick="copyRoom()">复制房间码</button>
+    </div>
+    <div id="playerList"></div>
+    <div id="startArea"></div>
+  </div>
+
+  <!-- 游戏 -->
+  <div id="game" class="panel hidden">
+    <div class="row" style="justify-content:space-between;">
+      <div class="phase" id="roundLabel"></div>
+      <div class="phase" id="phaseLabel"></div>
+    </div>
+      <div id="scorePanel" class="panel hidden score-panel">
+        <div class="scoreboard" id="scoreboard"></div>
+      </div>
+
+    <div class="event-name" id="eventName"></div>
+    <div class="rule" id="eventRule"></div>
+    <div id="gameBody" style="margin-top:14px;"></div>
+  </div>
+
+  <!-- 积分榜 -->
+  <div id="scorePanelOld" class="panel hidden">
+    <h3>积分榜</h3>
+    <div class="scoreboard" id="scoreboard"></div>
+  </div>
+
+  <!-- 聊天 -->
+  <div id="chatPanel" class="panel hidden">
+    <h3>讨论区</h3>
+    <div id="chatBox" class="chat-box"></div>
+    <div class="chat-input-row">
+      <input id="chatInput" placeholder="说点什么（可以撒谎）" maxlength="200">
+      <button onclick="sendChat()">发送</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let socket;
+let myId = null;
+let myRoom = null;
+let host = false;
+let players = [];
+let currentEvent = null;
+let phase = '';
+let myChoice = null;
+let myBid = null;
+let myOpponent = null;
+let ultimatumOpponent = null;
+let scoreAnimated = false;
+let ultimatumRole = 'watch';
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  socket = new WebSocket(proto + location.host);
+  socket.onopen = () => { setStatus('已连接服务器'); };
+  socket.onclose = () => { setStatus('连接断开，请刷新页面重连'); };
+  socket.onmessage = e => handle(JSON.parse(e.data));
+}
+connect();
+
+function setStatus(text) {
+  document.getElementById('statusText').textContent = text || '';
+}
+
+function send(obj) {
+  if (socket && socket.readyState === 1) socket.send(JSON.stringify(obj));
+}
+
+function createRoom() {
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { alert('请输入昵称'); return; }
+  send({ type: 'create', name });
+  setStatus('正在创建房间…');
+}
+
+function joinRoom() {
+  const name = document.getElementById('nameInput').value.trim();
+  const code = document.getElementById('roomInput').value.trim().toUpperCase();
+  if (!name) { alert('请输入昵称'); return; }
+  if (!code) { alert('请输入房间码'); return; }
+  send({ type: 'join', name, roomCode: code });
+  setStatus('正在加入房间…');
+}
+
+function handle(msg) {
+  switch (msg.type) {
+    case 'created':
+    case 'joined': {
+      myId = msg.playerId;
+      myRoom = msg.code;
+      host = !!msg.host;
+      players = msg.players || [];
+      document.getElementById('landing').classList.add('hidden');
+      document.getElementById('lobby').classList.remove('hidden');
+      document.getElementById('chatPanel').classList.remove('hidden');
+      document.getElementById('roomCode').textContent = myRoom;
+      renderLobby();
+      renderScores();
+      break;
+    }
+    case 'lobby': {
+      players = msg.players || [];
+      renderLobby();
+      renderScores();
+      break;
+    }
+    case 'roundStart': {
+      players = msg.players || [];
+      currentEvent = msg.event;
+      phase = 'discussion';
+      myChoice = null;
+      ultimatumRole = 'watch';
+      myOpponent = null;
+      ultimatumOpponent = null;
+        scoreAnimated = false;
+      document.getElementById('lobby').classList.add('hidden');
+      document.getElementById('game').classList.remove('hidden');
+      document.getElementById('scorePanel').classList.remove('hidden');
+        document.querySelector('.container').classList.add('in-game');
+      document.getElementById('roundLabel').textContent = `第 ${msg.round} / ${msg.totalRounds} 轮`;
+      document.getElementById('eventName').textContent = currentEvent.name;
+      document.getElementById('eventRule').textContent = currentEvent.desc;
+      renderGame();
+      renderScores();
+      break;
+    }
+    case 'choiceOpen': {
+      phase = 'choosing';
+      currentEvent = msg.event || currentEvent;
+      players = msg.players || players;
+      myChoice = null;
+      renderGame();
+      renderScores();
+      break;
+    }
+      case 'opponent': {
+        if (msg.opponentId) {
+          myOpponent = { id: msg.opponentId, name: msg.opponentName };
+        } else {
+          myOpponent = null;
+        }
+        renderGame();
+        break;
+      }
+
+    case 'choiceSubmitted': {
+      renderGame();
+      break;
+    }
+    case 'ultimatumPhase': {
+      phase = msg.phase === 'propose' ? 'ultimatum_propose' : 'ultimatum_respond';
+      ultimatumRole = myId === msg.proposerId ? 'proposer' : (myId === msg.responderId ? 'responder' : 'watch');
+        ultimatumOpponent = msg.proposerId === myId ? msg.responderName : (msg.responderId === myId ? msg.proposerName : '');
+      currentEvent = currentEvent || { name: '最后通牒', desc: '' };
+      renderGame();
+      break;
+    }
+    case 'ultimatumOffer': {
+      // 回应者收到方案
+      phase = 'ultimatum_respond';
+      ultimatumRole = 'responder';
+      window._offer = { share: msg.share, proposerName: msg.proposerName };
+      renderGame();
+      break;
+    }
+      case 'centipedeTurn': {
+        phase = 'centipede_turn';
+        window._centipede = { turn: msg.turn, currentPlayerId: msg.currentPlayerId, currentPlayerName: msg.currentPlayerName, otherPlayerName: msg.otherPlayerName };
+        renderGame();
+        break;
+      }
+      case 'duelTurn': {
+        phase = 'duel_turn';
+        window._duel = { turn: msg.turn, pairIndex: msg.pairIndex, pairCount: msg.pairCount, currentPlayerId: msg.currentPlayerId, currentPlayerName: msg.currentPlayerName, otherPlayerName: msg.otherPlayerName };
+        renderGame();
+        break;
+      }
+      case 'repeatPhase': {
+        phase = 'repeat_choosing';
+        myChoice = null;
+        window._repeat = { round: msg.round, maxRound: msg.maxRound };
+        renderGame();
+        break;
+      }
+      case 'piratePhase': {
+        phase = msg.phase === 'propose' ? 'pirate_propose' : 'pirate_vote';
+        window._pirate = {
+          phase: msg.phase,
+          proposerId: msg.proposerId,
+          proposerName: msg.proposerName,
+          turn: msg.turn,
+          maxAttempts: msg.maxAttempts,
+          alivePlayers: msg.alivePlayers || [],
+          selfShare: 50
+        };
+        renderGame();
+        break;
+      }
+      case 'pirateVote': {
+        phase = 'pirate_vote';
+        window._pirate = {
+          phase: 'vote',
+          planText: msg.planText,
+          proposerName: msg.proposerName,
+          myVote: null
+        };
+        renderGame();
+        break;
+      }
+      case 'auctionOpen': {
+        phase = 'auction_bid';
+        myBid = null;
+        renderGame();
+        break;
+      }
+
+
+
+
+
+    case 'reveal': {
+      phase = 'reveal';
+      players = msg.players || players;
+      if (msg.mode === 'ultimatum') {
+        currentEvent = { name: '最后通牒', desc: '提议与回应结果' };
+      }
+      renderReveal(msg);
+      renderScores();
+      break;
+    }
+    case 'gameOver': {
+      phase = 'finished';
+      currentEvent = { name: '游戏结束', desc: '' };
+      renderGameOver(msg);
+      break;
+    }
+    case 'chat': {
+      appendChat(msg.name, msg.text);
+      break;
+    }
+    case 'error': {
+      alert(msg.message || '错误');
+      setStatus(msg.message || '');
+      break;
+    }
+  }
+}
+
+function renderLobby() {
+  document.getElementById('playerList').innerHTML = players.map(p => `<div>${escapeHtml(p.name)}${p.isBot ? '（机器人）' : ''}${p.id === myId ? '（你）' : ''}</div>`).join('');
+  const area = document.getElementById('startArea');
+  area.innerHTML = '';
+  if (host) {
+    area.innerHTML = `<button onclick="send({type:'addBot'})">添加机器人</button>
+      <button onclick="send({type:'start'})">开始游戏</button><br>
+      <span class="link"></span>`;
+  } else {
+    area.innerHTML = '<span class="link">等待房主开始游戏…</span>';
+  }
+}
+
+function renderGame() {
+  const body = document.getElementById('gameBody');
+  let html = '';
+  if (phase === 'discussion') {
+    html += `<div class="phase">自由讨论阶段</div>
+      <p>可以在下方讨论区聊天、承诺、威胁、撒谎。</p>`;
+    if (host) {
+      html += `<button onclick="send({type:'startChoice'})">开始本轮选择</button>`;
+    } else {
+      html += `<p class="link">等待房主开始选择…</p>`;
+    }
+  } else if (phase === 'choosing' || phase === 'repeat_choosing') {
+    const acts = currentEvent.actions || [];
+    html += `<div class="phase">秘密选择</div>`;
+      if (myOpponent && myOpponent.name) html += `<div class="phase">对手：${escapeHtml(myOpponent.name)}</div>`;
+    if (myChoice) {
+      html += `<p>你已选择：${escapeHtml(myChoice)}</p><p class="link">等待其他玩家提交…</p>`;
+    } else {
+      html += `<div class="actions">${acts.map(a => `<div class="action-card" onclick="choose('${a}')">${a}</div>`).join('')}</div>`;
+    }
+  } else if (phase === 'ultimatum_propose') {
+    if (ultimatumRole === 'proposer') {
+      html += `<div class="phase">最后通牒 · 你是提议者</div>
+          <p>你的对手：${escapeHtml(ultimatumOpponent || '')}</p>
+        <p>你提议给对方多少分？共100分。</p>
+        <input type="range" min="0" max="100" value="50" id="shareRange" style="width:280px;">
+        <div>给对方 <span id="shareVal">50</span> 分，自己拿 <span id="keepVal">50</span> 分。</div>
+        <button onclick="submitProposal()">确认提议</button>`;
+    } else if (ultimatumRole === 'responder') {
+      html += `<div class="phase">最后通牒</div><p>你是回应者，等待提议者提交方案…</p>`;
+      if (ultimatumOpponent) html += `<p>你的对手：${escapeHtml(ultimatumOpponent)}</p>`;
+    } else {
+      html += `<div class="phase">最后通牒</div><p>等待提议者提出方案…</p>`;
+    }
+  } else if (phase === 'ultimatum_respond') {
+    if (ultimatumRole === 'responder' && window._offer) {
+      html += `<div class="phase">最后通牒 · 你是回应者</div>
+        <p>${escapeHtml(window._offer.proposerName)} 提出：你拿 ${window._offer.share} 分，他拿 ${100 - window._offer.share} 分。</p>
+        <button onclick="send({type:'ultimatumRespond', accept:true})">接受</button>
+        <button class="secondary" onclick="send({type:'ultimatumRespond', accept:false})">拒绝</button>`;
+    } else if (ultimatumRole === 'proposer') {
+      html += `<div class="phase">最后通牒</div><p>你已提交方案，等待回应者决定…</p>`;
+      if (ultimatumOpponent) html += `<p>你的对手：${escapeHtml(ultimatumOpponent)}</p>`;
+    } else {
+      html += `<div class="phase">最后通牒</div><p>等待回应者决定…</p>`;
+    }
+        } else if (phase === 'centipede_turn') {
+      const c = window._centipede || {};
+      const isMyTurn = c.currentPlayerId === myId;
+      html += `<div class="phase">蜈蚣博弈 · 第 ${c.turn || 1} 轮</div>
+        <p>当前决策者：${escapeHtml(c.currentPlayerName || '')}</p>
+        ${myOpponent && myOpponent.name ? `<p>你的对手：${escapeHtml(myOpponent.name)}</p>` : ''}
+        ${isMyTurn ? `<div class="actions">${(currentEvent.actions || []).map(a => `<div class="action-card" onclick="window.centipedeAction('${a}')">${a}</div>`).join('')}</div>` : '<p class="link">等待当前决策者选择…</p>'}
+        <p class="link">选择“继续”会把决策权交给对方；选择“停止”则立即结算。</p>`;
+    }
+    else if (phase === 'duel_turn') {
+      const d = window._duel || {};
+      const isMyTurn = d.currentPlayerId === myId;
+      html += `<div class="phase">决斗 · 第 ${d.pairIndex || 1}/${d.pairCount || 1} 场 · 第 ${d.turn || 1} 轮</div>
+        <p>当前决策者：${escapeHtml(d.currentPlayerName || '')}</p>
+        ${myOpponent && myOpponent.name ? `<p>你的对手：${escapeHtml(myOpponent.name)}</p>` : ''}
+        <p class="link">命中率：第1轮20%，第2轮40%，第3轮60%，第4轮80%。</p>
+        ${isMyTurn ? `<div class="actions">${(currentEvent.actions || []).map(a => `<div class="action-card" onclick="window.duelAction('${a}')">${a}</div>`).join('')}</div>` : '<p class="link">等待当前决策者选择…</p>'}
+        <p class="link">选择“继续靠近”会交给对方；选择“开枪”则按当前命中率判定。</p>`;
+    }
+    else if (phase === 'pirate_propose') {
+      const p = window._pirate || {};
+      const isMyTurn = p.proposerId === myId;
+      html += `<div class="phase">海盗分金 · 提案第${p.turn || 1}次</div>
+        <p>当前提案者：${escapeHtml(p.proposerName || '')}</p>
+        ${isMyTurn ? `<div class="row">${(p.alivePlayers || []).map((pl, i) => `<span>${escapeHtml(pl.name)}</span><input type="number" min="0" max="100" value="${Math.floor(100 / Math.max(1, (p.alivePlayers || []).length))}" data-pirate-id="${pl.id}" style="width:80px;">`).join('')}</div><div>合计 <span id="pirateTotal">0</span> / 100</div><button onclick="piratePropose()">提交方案</button>` : '<p class="link">等待提案者提出方案…</p>'}
+        <p class="link">方案需要超过半数同意才能通过。</p>`;
+    }
+    else if (phase === 'pirate_vote') {
+      const p = window._pirate || {};
+      const alreadyVoted = p.myVote !== null && p.myVote !== undefined;
+      html += `<div class="phase">海盗分金 · 投票</div>
+        <p>${escapeHtml(p.proposerName || '')} 提案：${escapeHtml(p.planText || '')}</p>
+        ${alreadyVoted ? '<p class="link">你已投票，等待其他人…</p>' : `<div class="actions"><div class="action-card" onclick="pirateVote(true)">同意</div><div class="action-card secondary" onclick="pirateVote(false)">反对</div></div>`}
+        <p class="link">超过半数同意则通过；否则提案者扣50，换下一个人。</p>`;
+    }
+    else if (phase === 'auction_bid') {
+      html += `<div class="phase">全支付拍卖 · 秘密出价</div>
+        <div class="row"><input type="range" min="0" max="200" value="50" id="auctionBidRange" style="width:280px;"><span id="auctionBidVal">50</span>分</div>
+        <button onclick="auctionBid()">提交出价</button>
+        <p class="link">所有人都会支付这次出价；最高价者获得奖励 = 玩家人数 × 20 分。</p>`;
+    }
+
+
+
+  else if (phase === 'reveal') {
+    html += `<div class="phase">本轮已结算</div><button onclick="hostNext()">下一轮</button>`;
+  }
+  document.getElementById('phaseLabel').textContent = phaseLabelText();
+  body.innerHTML = html;
+  if (phase === 'ultimatum_propose' && ultimatumRole === 'proposer') {
+    const r = document.getElementById('shareRange');
+    if (r) r.addEventListener('input', function () {
+      document.getElementById('shareVal').textContent = this.value;
+      document.getElementById('keepVal').textContent = 100 - parseInt(this.value);
+    });
+  }
+    if (phase === 'pirate_propose') {
+      const r = document.getElementById('pirateShareRange');
+      if (r) r.addEventListener('input', function () {
+        document.getElementById('pirateShareVal').textContent = this.value;
+      });
+    }
+      if (phase === 'pirate_propose') {
+        const inputs = document.querySelectorAll('[data-pirate-id]');
+        const updateTotal = () => {
+          let t = 0;
+          inputs.forEach(i => t += parseInt(i.value) || 0);
+          const el = document.getElementById('pirateTotal');
+          if (el) el.textContent = t;
+        };
+        inputs.forEach(i => i.addEventListener('input', updateTotal));
+        updateTotal();
+      }
+
+      if (phase === 'auction_bid') {
+        const r = document.getElementById('auctionBidRange');
+        if (r) r.addEventListener('input', function () {
+          document.getElementById('auctionBidVal').textContent = this.value;
+        });
+      }
+
+
+
+window.centipedeAction = function (action) {
+  send({ type: 'centipedeAction', action });
+  renderGame();
+}
+
+  window.duelAction = function (action) {
+    send({ type: 'duelAction', action });
+    renderGame();
+  }
+
+  window.piratePropose = function () {
+    const proposal = {};
+    document.querySelectorAll('[data-pirate-id]').forEach(i => {
+      proposal[i.dataset.pirateId] = parseInt(i.value) || 0;
+    });
+    const total = Object.values(proposal).reduce((a, b) => a + b, 0);
+    if (total !== 100) { alert('合计必须是100分'); return; }
+    send({ type: 'piratePropose', proposal });
+    renderGame();
+  }
+  window.pirateVote = function (accept) {
+    window._pirate.myVote = accept;
+    send({ type: 'pirateVote', accept });
+    renderGame();
+  }
+  window.auctionBid = function () {
+    const val = document.getElementById('auctionBidRange')?.value || 0;
+    myBid = parseInt(val);
+    send({ type: 'auctionBid', bid: myBid });
+    renderGame();
+  }
+
+}
+
+function choose(action) {
+  if (myChoice) return;
+  myChoice = action;
+  send({ type: 'choose', choice: action });
+  renderGame();
+}
+
+function submitProposal() {
+  const share = parseInt(document.getElementById('shareRange').value);
+  send({ type: 'ultimatumPropose', share });
+  renderGame();
+}
+
+function hostNext() {
+  if (host) send({ type: 'nextRound' });
+}
+
+function phaseLabelText() {
+  return phase === 'discussion' ? '讨论阶段' :
+         phase === 'choosing' ? '选择阶段' : phase === 'repeat_choosing' ? '重复囚徒困境' :
+         phase === 'ultimatum_propose' ? '提议阶段' :
+         phase === 'ultimatum_respond' ? '回应阶段' :
+         phase === 'centipede_turn' ? '蜈蚣博弈' : phase === 'duel_turn' ? '决斗' : phase === 'pirate_propose' ? '海盗提案' : phase === 'pirate_vote' ? '海盗投票' : phase === 'auction_bid' ? '全支付拍卖' : phase === 'reveal' ? '结算完成' : '游戏中';
+}
+
+function renderReveal(msg) {
+  const body = document.getElementById('gameBody');
+  let rows = '';
+  if (msg.mode === 'normal') {
+    rows = players.map(p => {
+      const choice = msg.choices[p.id] || '—';
+      const delta = msg.delta[p.id] != null ? msg.delta[p.id] : 0;
+      return `<div class="result-row"><div class="name">${escapeHtml(p.name)}</div><div>${escapeHtml(choice)}</div><div class="delta ${delta<0?'neg':''}">${delta>0?'+':''}${delta.toFixed(2)}</div></div>`;
+    }).join('');
+  } else {
+    rows = players.map(p => {
+      let role = (msg.roles && msg.roles[p.id]) ? msg.roles[p.id] : ((msg.mode === 'centipede' || msg.mode === 'duel' || msg.mode === 'repeat' || msg.mode === 'pirate' || msg.mode === 'auction') ? (msg.delta[p.id] !== 0 ? '参与者' : '旁观') : '旁观');
+      let delta = msg.delta[p.id] || 0;
+      if (p.name === msg.proposerName) role = '提议者';
+      else if (p.name === msg.responderName) role = '回应者';
+      return `<div class="result-row"><div class="name">${escapeHtml(p.name)}</div><div>${role}</div><div class="delta ${delta<0?'neg':''}">${delta>0?'+':''}${delta}</div></div>`;
+    }).join('');
+  }
+  body.innerHTML = `
+    <div class="phase">本轮结算</div>
+    <div class="warn">${escapeHtml(msg.detail || (msg.mode === 'ultimatum' ? (msg.accept ? '交易达成' : '交易破裂') : ''))}</div>
+    ${rows}
+    ${msg.mode === 'repeat' && msg.finished === false ? '' : (host ? '<button onclick="hostNext()">下一轮</button>' : '<p class="link">等待房主进入下一轮…</p>')}
+  `;
+  document.getElementById('phaseLabel').textContent = '结算完成';
+}
+
+function renderGameOver(msg) {
+  document.getElementById('game').classList.remove('hidden');
+  document.getElementById('gameBody').innerHTML = `<h2>游戏结束</h2>
+    <div class="rule">${msg.sorted.map((p, i) => `第${i+1}名：${escapeHtml(p.name)}（${p.score}分）`).join('\n')}</div>
+    <p style="font-size:20px;margin-top:14px;">${escapeHtml(msg.sorted[0]?.name || '')} 获胜！</p>`;
+  document.getElementById('phaseLabel').textContent = '游戏结束';
+}
+
+function renderScores() {
+  const panel = document.getElementById('scorePanel');
+  if (!players.length) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  document.getElementById('scoreboard').innerHTML = players.map(p =>
+    `<div class="score"><div class="name">${escapeHtml(p.name)}</div><div class="pts">${p.score}</div></div>`
+  ).join('');
+  const n = players.length;
+  const board = document.getElementById('scoreboard');
+  const cards = board.querySelectorAll('.score');
+  const placeCards = () => {
+    cards.forEach((card, i) => {
+      const angle = -90 + (360 / n) * i;
+      const r = 50;
+      const rad = angle * Math.PI / 180;
+      const x = 50 + r * Math.cos(rad);
+      const y = 50 + r * Math.sin(rad);
+      card.style.left = x + '%';
+      card.style.top = y + '%';
+    });
+  };
+  if (!scoreAnimated) {
+    cards.forEach(card => { card.style.left = '50%'; card.style.top = '50%'; });
+    requestAnimationFrame(() => {
+      placeCards();
+      scoreAnimated = true;
+    });
+  } else {
+    placeCards();
+  }
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  send({ type: 'chat', text });
+  input.value = '';
+}
+
+function appendChat(name, text) {
+  const box = document.getElementById('chatBox');
+  box.innerHTML += `<div><b>${escapeHtml(name)}</b>：${escapeHtml(text)}</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+
+function copyRoom() {
+  if (navigator.clipboard) navigator.clipboard.writeText(myRoom || '');
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
