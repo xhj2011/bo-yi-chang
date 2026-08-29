@@ -92,7 +92,8 @@
     }
     .container.in-game > h1 { grid-column: 1 / 3; }
     .container.in-game > #game { grid-column: 1; grid-row: 2; }
-    .container.in-game > #scorePanel { grid-column: 1; grid-row: 3; }
+    .container.in-game > #scorePanel,
+  #scorePanel.panel { grid-column: 1; grid-row: 3; }
     .container.in-game > #chatPanel { grid-column: 2; grid-row: 2 / 4; }
     #game {
       min-height: 420px;
@@ -151,12 +152,15 @@
         z-index: 1;
       padding: 90px 80px;
     }
-    #scorePanel {
+    #scorePanel,
+  #scorePanel.panel {
       position: absolute;
       inset: 45px 45px 45px 45px;
       background: transparent;
       border: none;
       box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
       pointer-events: none;
       z-index: 5;
       margin: 0;
@@ -207,6 +211,378 @@
     }
 
 
+  /* ===== 界面美化 ===== */
+  :root {
+    --gold: #d9a75f;
+    --gold-light: #f6d67a;
+    --green-bg: #0d1512;
+    --panel-bg: rgba(22, 32, 26, 0.94);
+    --panel-border: rgba(217, 167, 95, 0.35);
+  }
+
+  body {
+    background:
+      radial-gradient(circle at 15% 15%, rgba(60, 100, 65, 0.18), transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(120, 75, 30, 0.14), transparent 45%),
+      linear-gradient(135deg, #0b0f0d, #101b14 50%, #0d1512);
+    min-height: 100vh;
+  }
+
+  h1 {
+    color: var(--gold-light);
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(217, 167, 95, 0.25);
+    letter-spacing: 2px;
+  }
+
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+  }
+
+  .panel h2, .panel h3 {
+    color: var(--gold-light);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+  }
+
+  input {
+    background: rgba(12, 18, 15, 0.9);
+    border: 1px solid #3e4f42;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(217, 167, 95, 0.18), inset 0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+
+  button {
+    background: linear-gradient(135deg, #3f8cff, #2563eb);
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
+  }
+
+  button.secondary {
+    background: linear-gradient(135deg, #4b5563, #374151);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+
+  #game {
+    background: radial-gradient(circle at 50% 18%, #1c3928, #0d1a12 75%);
+    border-color: #6b4423;
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.55), 0 14px 44px rgba(0, 0, 0, 0.6);
+  }
+
+  #eventName {
+    letter-spacing: 3px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 26px rgba(246, 214, 122, 0.28);
+  }
+
+  #eventName::after {
+    content: '';
+    display: block;
+    width: 90px;
+    height: 2px;
+    margin: 8px auto 0;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    border-radius: 2px;
+  }
+
+  #eventRule {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 0 34px rgba(138, 106, 44, 0.16);
+    border-radius: 16px;
+  }
+
+  .score {
+    box-shadow:
+      0 6px 18px rgba(0, 0, 0, 0.55),
+      inset 0 2px 5px rgba(255, 255, 255, 0.45),
+      inset 0 -4px 8px rgba(90, 55, 10, 0.35);
+    border-color: #a67c35;
+  }
+
+  .action-card {
+    background: linear-gradient(145deg, #a33728, #5a1a14);
+    border: 2px solid #e0b36a;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .action-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  #playerList > div {
+    background: rgba(28, 42, 34, 0.95);
+    border: 1px solid rgba(217, 167, 95, 0.35);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .chat-box {
+    background: rgba(10, 16, 13, 0.85);
+    border: 1px solid rgba(217, 167, 95, 0.2);
+  }
+
+  .result-row {
+    transition: background 0.2s;
+  }
+
+  .result-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  #eventRule, #gameBody {
+    animation: fadeSlideIn 0.35s ease;
+  }
+  /* ===== 现代风格重绘 ===== */
+  body {
+    font-family: "Nunito", "Varela Round", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", "Microsoft YaHei UI", sans-serif;
+  }
+
+  h1, h2, h3, #eventName, .phase {
+    font-family: "Baloo 2", "Varela Round", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  h1 {
+    background: linear-gradient(90deg, #a5b4fc, #67e8f9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: #a5b4fc;
+  }
+
+  .panel {
+    background: rgba(17, 24, 39, 0.86);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 22px;
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(12px);
+  }
+
+  .panel h2, .panel h3 {
+    color: #e0e7ff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  input {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 14px;
+    color: #f1f5f9;
+  }
+
+  button {
+    font-family: inherit;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+  }
+
+  button.secondary {
+    background: linear-gradient(135deg, #475569, #334155);
+  }
+
+  #game {
+    background: linear-gradient(160deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.98));
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 26px;
+    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+  }
+
+  #eventName {
+    background: linear-gradient(90deg, #c7d2fe, #67e8f9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: #c7d2fe;
+    text-shadow: none;
+  }
+
+  #eventName::after {
+    background: linear-gradient(90deg, transparent, #818cf8, #22d3ee, transparent);
+  }
+
+  #eventRule {
+    background: rgba(255, 255, 255, 0.07);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    border-radius: 20px;
+    font-family: inherit;
+    line-height: 1.8;
+  }
+
+  .score {
+    background: linear-gradient(145deg, #334155, #1e293b);
+    color: #f8fafc;
+    border: 2px solid rgba(129, 140, 248, 0.55);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  }
+
+  .score .name {
+    color: #cbd5e1;
+  }
+
+  .score .pts {
+    color: #f8fafc;
+  }
+
+  .action-card {
+    font-family: "Baloo 2", "Varela Round", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(145deg, #4f46e5, #7c3aed);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #fff;
+    border-radius: 18px;
+    box-shadow: 0 8px 22px rgba(79, 70, 229, 0.35);
+  }
+
+  .action-card:hover {
+    background: linear-gradient(145deg, #6366f1, #8b5cf6);
+  }
+
+  #playerList > div {
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 999px;
+  }
+
+  .chat-box {
+    background: rgba(10, 15, 25, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+  }
+
+  .chat-input-row input {
+    border-radius: 999px;
+  }
+
+  .result-row {
+    border-bottom-color: rgba(148, 163, 184, 0.12);
+  }
+
+  .phase {
+    color: #94a3b8;
+  }
+
+  .link {
+    color: #94a3b8;
+  }
+  @media (max-width: 900px) {
+    body {
+      padding: 8px;
+    }
+    .container.in-game {
+      display: block;
+      max-width: 100%;
+    }
+    .container.in-game > #game {
+      width: 100%;
+    }
+    .container.in-game > #chatPanel {
+      width: 100%;
+      margin-top: 14px;
+    }
+    #game {
+      min-height: 520px;
+      padding: 50px 20px;
+    }
+    #scorePanel,
+  #scorePanel.panel {
+      inset: 28px 18px 28px 18px;
+      z-index: 20;
+    }
+    .score {
+      width: 64px;
+      height: 64px;
+    }
+    .score .name {
+      font-size: 11px;
+    }
+    .score .pts {
+      font-size: 16px;
+    }
+    #eventName {
+      font-size: 24px;
+      margin: 4px 0;
+    }
+    #eventRule {
+      max-width: none;
+      margin: 0 6px;
+      padding: 12px;
+      font-size: 14px;
+    }
+    #gameBody {
+      margin-top: 14px;
+    }
+    .actions {
+      flex-direction: column;
+      align-items: center;
+    }
+    .action-card {
+      min-width: 100px;
+      padding: 10px 16px;
+      font-size: 15px;
+    }
+    .chat-box {
+      max-height: 220px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #game {
+      min-height: 470px;
+      padding: 42px 12px;
+    }
+    #scorePanel,
+  #scorePanel.panel {
+      inset: 22px 10px 22px 10px;
+      z-index: 20;
+    }
+    .score {
+      width: 56px;
+      height: 56px;
+    }
+    .score .name {
+      font-size: 10px;
+    }
+    .score .pts {
+      font-size: 14px;
+    }
+    #eventName {
+      font-size: 20px;
+    }
+    #eventRule {
+      font-size: 13px;
+      padding: 10px;
+    }
+    .action-card {
+      min-width: 90px;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    input, button {
+      font-size: 14px;
+    }
+  }
 </style>
 
 
@@ -275,6 +651,7 @@
 
 <script>
 let socket;
+let heartbeatTimer = null;
 let myId = null;
 let myRoom = null;
 let host = false;
@@ -287,12 +664,22 @@ let myOpponent = null;
 let ultimatumOpponent = null;
 let scoreAnimated = false;
 let ultimatumRole = 'watch';
+let ultimatumAnswered = null;
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
   socket = new WebSocket(proto + location.host);
-  socket.onopen = () => { setStatus('已连接服务器'); };
-  socket.onclose = () => { setStatus('连接断开，请刷新页面重连'); };
+  socket.onopen = () => {
+    setStatus('已连接服务器');
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(() => {
+      if (socket && socket.readyState === 1) send({ type: 'ping' });
+    }, 20000);
+  };
+  socket.onclose = () => {
+    setStatus('连接断开，请刷新页面重连');
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+  };
   socket.onmessage = e => handle(JSON.parse(e.data));
 }
 connect();
@@ -351,13 +738,14 @@ function handle(msg) {
       ultimatumRole = 'watch';
       myOpponent = null;
       ultimatumOpponent = null;
+      ultimatumAnswered = null;
         scoreAnimated = false;
       document.getElementById('lobby').classList.add('hidden');
       document.getElementById('game').classList.remove('hidden');
       document.getElementById('scorePanel').classList.remove('hidden');
         document.querySelector('.container').classList.add('in-game');
       document.getElementById('roundLabel').textContent = `第 ${msg.round} / ${msg.totalRounds} 轮`;
-      document.getElementById('eventName').textContent = currentEvent.name;
+      document.getElementById('eventName').textContent = eventIcon(currentEvent.id) + ' ' + currentEvent.name;
       document.getElementById('eventRule').textContent = currentEvent.desc;
       renderGame();
       renderScores();
@@ -390,6 +778,7 @@ function handle(msg) {
       phase = msg.phase === 'propose' ? 'ultimatum_propose' : 'ultimatum_respond';
       ultimatumRole = myId === msg.proposerId ? 'proposer' : (myId === msg.responderId ? 'responder' : 'watch');
         ultimatumOpponent = msg.proposerId === myId ? msg.responderName : (msg.responderId === myId ? msg.proposerName : '');
+        ultimatumAnswered = null;
       currentEvent = currentEvent || { name: '最后通牒', desc: '' };
       renderGame();
       break;
@@ -399,6 +788,7 @@ function handle(msg) {
       phase = 'ultimatum_respond';
       ultimatumRole = 'responder';
       window._offer = { share: msg.share, proposerName: msg.proposerName };
+      ultimatumAnswered = null;
       renderGame();
       break;
     }
@@ -520,12 +910,18 @@ function renderGame() {
     }
   } else if (phase === 'ultimatum_propose') {
     if (ultimatumRole === 'proposer') {
-      html += `<div class="phase">最后通牒 · 你是提议者</div>
+      if (ultimatumAnswered === 'proposed') {
+        html += `<div class="phase">最后通牒 · 你是提议者</div>
           <p>你的对手：${escapeHtml(ultimatumOpponent || '')}</p>
-        <p>你提议给对方多少分？共100分。</p>
-        <input type="range" min="0" max="100" value="50" id="shareRange" style="width:280px;">
-        <div>给对方 <span id="shareVal">50</span> 分，自己拿 <span id="keepVal">50</span> 分。</div>
-        <button onclick="submitProposal()">确认提议</button>`;
+          <p class="link">你已提交方案，等待回应者决定…</p>`;
+      } else {
+        html += `<div class="phase">最后通牒 · 你是提议者</div>
+          <p>你的对手：${escapeHtml(ultimatumOpponent || '')}</p>
+          <p>你提议给对方多少分？共100分。</p>
+          <input type="range" min="0" max="100" value="50" id="shareRange" style="width:280px;">
+          <div>给对方 <span id="shareVal">50</span> 分，自己拿 <span id="keepVal">50</span> 分。</div>
+          <button onclick="submitProposal()">确认提议</button>`;
+      }
     } else if (ultimatumRole === 'responder') {
       html += `<div class="phase">最后通牒</div><p>你是回应者，等待提议者提交方案…</p>`;
       if (ultimatumOpponent) html += `<p>你的对手：${escapeHtml(ultimatumOpponent)}</p>`;
@@ -534,10 +930,17 @@ function renderGame() {
     }
   } else if (phase === 'ultimatum_respond') {
     if (ultimatumRole === 'responder' && window._offer) {
-      html += `<div class="phase">最后通牒 · 你是回应者</div>
-        <p>${escapeHtml(window._offer.proposerName)} 提出：你拿 ${window._offer.share} 分，他拿 ${100 - window._offer.share} 分。</p>
-        <button onclick="send({type:'ultimatumRespond', accept:true})">接受</button>
-        <button class="secondary" onclick="send({type:'ultimatumRespond', accept:false})">拒绝</button>`;
+      const offerText = `${escapeHtml(window._offer.proposerName)} 提出：你拿 ${window._offer.share} 分，他拿 ${100 - window._offer.share} 分。`;
+      if (ultimatumAnswered) {
+        html += `<div class="phase">最后通牒 · 你是回应者</div>
+          <p>${offerText}</p>
+          <p class="link">你已选择${ultimatumAnswered === 'accepted' ? '接受' : '拒绝'}，等待结算…</p>`;
+      } else {
+        html += `<div class="phase">最后通牒 · 你是回应者</div>
+          <p>${offerText}</p>
+          <button onclick="ultimatumRespond(true)">接受</button>
+          <button class="secondary" onclick="ultimatumRespond(false)">拒绝</button>`;
+      }
     } else if (ultimatumRole === 'proposer') {
       html += `<div class="phase">最后通牒</div><p>你已提交方案，等待回应者决定…</p>`;
       if (ultimatumOpponent) html += `<p>你的对手：${escapeHtml(ultimatumOpponent)}</p>`;
@@ -670,9 +1073,16 @@ function choose(action) {
 
 function submitProposal() {
   const share = parseInt(document.getElementById('shareRange').value);
+  ultimatumAnswered = 'proposed';
   send({ type: 'ultimatumPropose', share });
   renderGame();
 }
+
+window.ultimatumRespond = function (accept) {
+  ultimatumAnswered = accept ? 'accepted' : 'rejected';
+  send({ type: 'ultimatumRespond', accept });
+  renderGame();
+};
 
 function hostNext() {
   if (host) send({ type: 'nextRound' });
@@ -691,7 +1101,7 @@ function renderReveal(msg) {
   let rows = '';
   if (msg.mode === 'normal') {
     rows = players.map(p => {
-      const choice = msg.choices[p.id] || '—';
+      const choice = msg.choices[p.id] || (msg.delta[p.id] != null ? '已选择' : '—');
       const delta = msg.delta[p.id] != null ? msg.delta[p.id] : 0;
       return `<div class="result-row"><div class="name">${escapeHtml(p.name)}</div><div>${escapeHtml(choice)}</div><div class="delta ${delta<0?'neg':''}">${delta>0?'+':''}${delta.toFixed(2)}</div></div>`;
     }).join('');
@@ -767,10 +1177,60 @@ function appendChat(name, text) {
   box.scrollTop = box.scrollHeight;
 }
 
+document.getElementById('chatInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendChat();
+  }
+});
+
 function copyRoom() {
-  if (navigator.clipboard) navigator.clipboard.writeText(myRoom || '');
+  const text = myRoom || '';
+  if (!text) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('房间码已复制：' + text);
+    }).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
 }
 
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    alert('房间码已复制：' + text);
+  } catch (e) {
+    alert('复制失败，请手动复制：' + text);
+  }
+  document.body.removeChild(ta);
+}
+
+function eventIcon(id) {
+  const icons = {
+    prisoner: '⚖️',
+    public: '🏘️',
+    stag: '🦌',
+    volunteer: '🗼',
+    ultimatum: '⛵',
+    trust: '🏦',
+    minority: '🚦',
+    cournot: '🏭',
+    duel: '🔫',
+    repeat_prisoner: '🔒',
+    pirate: '🏴‍☠️',
+    allpay: '🔨'
+  };
+  return icons[id] || '🎲';
+}
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }

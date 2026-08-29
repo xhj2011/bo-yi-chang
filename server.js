@@ -1275,7 +1275,15 @@ function handleMessage(ws, msg) {
       }
 
     case 'startChoice': {
-      if (room && room.hostId === ws.playerId) startChoice(room);
+      if (room && room.hostId === ws.playerId) {
+        if (room.phase === 'discussion') {
+          startChoice(room);
+        } else if (room.phase === 'choosing') {
+          broadcast(room, { type: 'choiceOpen', event: publicEvent(room.currentEvent), players: publicPlayers(room) });
+        } else if (room.phase === 'repeat_choosing' && room.repeat) {
+          broadcast(room, { type: 'repeatPhase', round: room.repeat.round, maxRound: room.repeat.maxRound, players: publicPlayers(room) });
+        }
+      }
       break;
     }
     case 'choose': {
@@ -1380,6 +1388,9 @@ function handleMessage(ws, msg) {
 
     case 'nextRound': {
       if (room && room.hostId === ws.playerId) nextRound(room);
+      break;
+    }
+    case 'ping': {
       break;
     }
     case 'chat': {
