@@ -12,7 +12,7 @@ const TRAITS = [
   { id: 'aggressor', name: '激进者', desc: '你赚的时候多赚12分；你赔的时候再多赔12分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
   { id: 'conservative', name: '保守者', desc: '你赚的时候少赚4分；你赔的时候少赔4分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半；有收益时+2' } },
   { id: 'lucky', name: '幸运儿', desc: '结算随机浮动-6~+10分', skill: { id: 'destiny', name: '天命', desc: '本轮高波动：50% +15，50% -5' } },
-  { id: 'strategist', name: '谋略家', desc: '在拍卖/决斗/最后通牒/海盗等复杂事件中额外+7', skill: { id: 'foresight', name: '运筹', desc: '本轮额外+6分' } }
+  { id: 'strategist', name: '谋略家', desc: '在拍卖/决斗/最后通牒/海盗等复杂事件中额外+7', skill: { id: 'puppet', name: '幕后推手', desc: '选择一名玩家，本轮若TA盈利，你获得其盈利的30%；若TA亏损，你无损失' } }
 ];
 const COOP_ACTIONS = {
   prisoner: ['合作'],
@@ -512,6 +512,7 @@ function startRound(room) {
   room.readConfirmed = {};
   room.phase = 'reading';
   room.activeSkillEffects = {};
+  room.activeSkillTargets = {};
   room.choices = {};
   room.currentEvent = room.deck[room.roundIndex];
   room.ultimatum = null;
@@ -1383,8 +1384,17 @@ function applyIdentityToDeltas(room, deltas) {
       else if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
       else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + 2;
       else if (skillId === 'destiny') d += (Math.random() < 0.5 ? 15 : -5);
-      else if (skillId === 'foresight') d += 6;
       deltas[p.id] = d;
+    });
+  }
+  if (room.activeSkillTargets) {
+    room.players.forEach(p => {
+      const skillId = room.activeSkillEffects && room.activeSkillEffects[p.id];
+      const targetId = room.activeSkillTargets[p.id];
+      if (skillId === 'puppet' && targetId) {
+        const targetDelta = deltas[targetId] || 0;
+        if (targetDelta > 0) deltas[p.id] = (deltas[p.id] || 0) + Math.round(targetDelta * 0.3);
+      }
     });
   }
   return deltas;
@@ -1549,6 +1559,7 @@ function handleMessage(ws, msg) {
         if (room.difficulty === 'hard') {
           room.usedSkills = {};
           room.activeSkillEffects = {};
+  room.activeSkillTargets = {};
           room.phase = 'trait_select';
           broadcast(room, { type: 'traitSelect', traits: TRAITS, players: publicPlayers(room) });
           room.players.forEach(p => {
@@ -1592,6 +1603,12 @@ function handleMessage(ws, msg) {
       if (room.usedSkills[player.id]) return;
       room.usedSkills[player.id] = true;
       room.activeSkillEffects[player.id] = trait.skill.id;
+      if (trait.id === 'strategist') {
+        const others = room.players.filter(x => x.id !== player.id);
+        if (others.length) {
+          room.activeSkillTargets[player.id] = others[Math.floor(Math.random() * others.length)].id;
+        }
+      }
       let shownSkillName = trait.skill.name;
       if (trait.id === 'disguiser' || trait.id === 'trickster') {
         const fakeSkills = TRAITS.filter(t => t.id !== trait.id).map(t => t.skill.name);
