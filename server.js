@@ -28,17 +28,17 @@ const STRATEGY_CARDS = [
   { id: 'small_gain', name: '小赚', rarity: 'common', color: '#94a3b8', desc: '本轮额外+4', effect: 'small_gain' },
   { id: 'stop_loss', name: '止损', rarity: 'common', color: '#94a3b8', desc: '本轮亏损最多-5', effect: 'stop_loss' },
   { id: 'boost', name: '加注', rarity: 'common', color: '#94a3b8', desc: '本轮收益+5', effect: 'boost' },
-  { id: 'disrupt', name: '干扰', rarity: 'rare', color: '#60a5fa', desc: '随机一名其他玩家本轮-3', effect: 'disrupt' },
-  { id: 'coop_card', name: '合作卡', rarity: 'rare', color: '#60a5fa', desc: '本轮如果选择合作类行动，收益+10', effect: 'coop_bonus' },
-  { id: 'aggr_card', name: '进攻卡', rarity: 'rare', color: '#f87171', desc: '本轮如果选择背叛/进攻类行动，收益+10', effect: 'aggr_bonus' },
-  { id: 'gamble', name: '豪赌', rarity: 'epic', color: '#c084fc', desc: '本轮随机-5~+15', effect: 'gamble' },
-  { id: 'prisoner_letter', name: '狱中密信', event: 'prisoner', rarity: 'common', color: '#94a3b8', desc: '囚徒困境：本轮合作收益+12', effect: 'coop_bonus' },
-  { id: 'public_support', name: '村长支持', event: 'public', rarity: 'common', color: '#94a3b8', desc: '公共品：本轮投入收益+12', effect: 'coop_bonus' },
-  { id: 'stag_track', name: '追踪术', event: 'stag', rarity: 'common', color: '#94a3b8', desc: '猎鹿：本轮猎鹿收益+12', effect: 'coop_bonus' },
-  { id: 'volunteer_lamp', name: '守夜人', event: 'volunteer', rarity: 'common', color: '#94a3b8', desc: '灯塔：本轮站出来收益+12', effect: 'coop_bonus' },
-  { id: 'trust_help', name: '央行支持', event: 'trust', rarity: 'common', color: '#94a3b8', desc: '银行：本轮继续投资收益+12', effect: 'coop_bonus' },
-  { id: 'minority_oracle', name: '先知', event: 'minority', rarity: 'epic', color: '#c084fc', desc: '少数者：如果你在少数方，额外+15', effect: 'minority_bonus' },
-  { id: 'cournot_dump', name: '低价倾销', event: 'cournot', rarity: 'common', color: '#94a3b8', desc: '古诺：本轮低产量收益+12', effect: 'coop_bonus' }
+  { id: 'prisoner_letter', name: '狱中密信', event: 'prisoner', rarity: 'common', color: '#94a3b8', value: 6, desc: '囚徒困境：本轮合作收益+6', effect: 'coop_bonus' },
+  { id: 'public_support', name: '村长支持', event: 'public', rarity: 'common', color: '#94a3b8', value: 6, desc: '公共品：本轮投入收益+6', effect: 'coop_bonus' },
+  { id: 'cournot_dump', name: '低价倾销', event: 'cournot', rarity: 'common', color: '#94a3b8', value: 6, desc: '古诺：本轮低产量收益+6', effect: 'coop_bonus' },
+  { id: 'disrupt', name: '干扰', rarity: 'rare', color: '#60a5fa', value: 5, desc: '随机一名其他玩家本轮-5', effect: 'disrupt' },
+  { id: 'coop_card', name: '合作卡', rarity: 'rare', color: '#60a5fa', value: 10, desc: '本轮如果选择合作类行动，收益+10', effect: 'coop_bonus' },
+  { id: 'aggr_card', name: '进攻卡', rarity: 'rare', color: '#f87171', value: 10, desc: '本轮如果选择背叛/进攻类行动，收益+10', effect: 'aggr_bonus' },
+  { id: 'stag_track', name: '追踪术', event: 'stag', rarity: 'rare', color: '#60a5fa', value: 10, desc: '猎鹿：本轮猎鹿收益+10', effect: 'coop_bonus' },
+  { id: 'volunteer_lamp', name: '守夜人', event: 'volunteer', rarity: 'rare', color: '#60a5fa', value: 10, desc: '灯塔：本轮站出来收益+10', effect: 'coop_bonus' },
+  { id: 'trust_help', name: '央行支持', event: 'trust', rarity: 'rare', color: '#60a5fa', value: 10, desc: '银行：本轮继续投资收益+10', effect: 'coop_bonus' },
+  { id: 'gamble', name: '豪赌', rarity: 'epic', color: '#c084fc', value: 20, desc: '本轮随机-8~+20', effect: 'gamble' },
+  { id: 'minority_oracle', name: '先知', event: 'minority', rarity: 'epic', color: '#c084fc', value: 15, desc: '少数者：如果你在少数方，额外+15', effect: 'minority_bonus' }
 ];
 const EVENT_TWISTS = {
   public: [
@@ -1382,14 +1382,14 @@ function applyStrategyCards(room, deltas) {
     else if (card.effect === 'boost') d += 5;
     else if (card.effect === 'small_gain') d += 4;
     else if (card.effect === 'stop_loss') d = d < 0 ? Math.max(d, -5) : d;
-    else if (card.effect === 'gamble') d += (Math.floor(Math.random() * 21) - 5);
-    else if (card.effect === 'coop_bonus' && coopSet.includes(room.choices[p.id])) d += 10;
-    else if (card.effect === 'aggr_bonus' && coopSet.length && !coopSet.includes(room.choices[p.id])) d += 10;
+    else if (card.effect === 'gamble') d += (Math.floor(Math.random() * ((card.value || 20) + 9)) - 8);
+    else if (card.effect === 'coop_bonus' && coopSet.includes(room.choices[p.id])) d += (card.value || 10);
+    else if (card.effect === 'aggr_bonus' && coopSet.length && !coopSet.includes(room.choices[p.id])) d += (card.value || 10);
     else if (card.effect === 'minority_bonus' && eventId === 'minority') {
       const a = room.players.filter(x => room.choices[x.id] === 'A').length;
       const b = room.players.length - a;
       const isMinor = (room.choices[p.id] === 'A' && a < b) || (room.choices[p.id] === 'B' && b < a);
-      if (isMinor) d += 15;
+      if (isMinor) d += (card.value || 15);
     }
     deltas[p.id] = d;
   });
@@ -1400,7 +1400,7 @@ function applyStrategyCards(room, deltas) {
     const others = room.players.filter(x => x.id !== p.id);
     if (others.length) {
       const target = others[Math.floor(Math.random() * others.length)];
-      deltas[target.id] = (deltas[target.id] || 0) - 3;
+      deltas[target.id] = (deltas[target.id] || 0) - (card.value || 5);
     }
   });
   return deltas;
