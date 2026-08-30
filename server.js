@@ -655,14 +655,10 @@ function resolveUltimatumAll(room) {
       if (pair.response) {
         deltas[proposer.id] += 100 - pair.share;
         deltas[responder.id] += pair.share;
-        proposer.score += 100 - pair.share;
-        responder.score += pair.share;
         lines.push(`${proposer.name} 给 ${responder.name} ${pair.share}，接受：前者+${100 - pair.share}，后者+${pair.share}`);
       } else {
         deltas[proposer.id] += -15;
           deltas[responder.id] += -15;
-          proposer.score -= 15;
-          responder.score -= 15;
           lines.push(`${proposer.name} 给 ${responder.name} ${pair.share}，拒绝：双方各-15`);
       }
     }
@@ -674,6 +670,8 @@ function resolveUltimatumAll(room) {
       roles[pair.responderId] = '回应者';
     });
 
+  applyIdentityToDeltas(room, deltas);
+  room.players.forEach(p => p.score += deltas[p.id] || 0);
   room.phase = 'reveal';
   broadcast(room, {
     type: 'reveal',
@@ -992,10 +990,10 @@ function resolveRepeatRound(room) {
     else { da = -30; db = -30; }
     deltas[pair.aId] = da;
     deltas[pair.bId] = db;
-    a.score += da;
-    b.score += db;
     lines.push(`${a.name}【${ca}】 vs ${b.name}【${cb}】：${a.name}${da>=0?'+':''}${da}，${b.name}${db>=0?'+':''}${db}`);
   });
+  applyIdentityToDeltas(room, deltas);
+  room.players.forEach(p => p.score += deltas[p.id] || 0);
   room.players.forEach(p => p.choice = null);
   room.choices = {};
   const finished = r.round >= r.maxRound;
@@ -1364,6 +1362,41 @@ function applyActiveSkills(room, result) {
   return result;
 }
 
+function applyIdentityToDeltas(room, deltas) {
+  if (room.difficulty !== 'hard' || !room.traits) return deltas;
+  const type = room.currentEvent ? room.currentEvent.type : '';
+  const risk = ['auction', 'duel', 'ultimatum', 'pirate'].includes(type);
+  room.players.forEach(p => {
+    const trait = room.traits[p.id];
+    if (!trait) return;
+    let d = deltas[p.id] || 0;
+    if (trait.id === 'aggressive') {
+      const a = risk ? 15 : 10;
+      deltas[p.id] = d > 0 ? d + a : d - a;
+    } else if (trait.id === 'conservative') {
+      const a = risk ? 7 : 5;
+      deltas[p.id] = d > 0 ? d - a : d + a;
+    } else if (trait.id === 'lucky') {
+      deltas[p.id] = d + (Math.floor(Math.random() * (risk ? 21 : 14)) - (risk ? 8 : 5));
+    } else if (trait.id === 'steady') {
+      const a = risk ? 5 : 4;
+      deltas[p.id] = d > 0 ? d + a : d - a;
+    }
+  });
+  if (room.activeSkillEffects) {
+    room.players.forEach(p => {
+      const skillId = room.activeSkillEffects[p.id];
+      if (!skillId) return;
+      let d = deltas[p.id] || 0;
+      if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
+      else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + (risk ? 5 : 3);
+      else if (skillId === 'destiny') d += (Math.random() < 0.5 ? 15 : -5);
+      else if (skillId === 'steady_gain') d += 8;
+      deltas[p.id] = d;
+    });
+  }
+  return deltas;
+}
 function applyHardModifier(room, result) {
   if (room.difficulty !== 'hard') return result;
   const mods = [
