@@ -178,7 +178,7 @@ const EVENTS = [
     name: '无法串供的审判',
     type: 'normal',
     actions: ['合作', '背叛'],
-    desc: `夜里的审讯室亮着一盏灯，你被带进一间没有窗户的房间。\n桌对面坐着另一个嫌疑人，你们都被指控犯了同一桩案子。\n狱警说：谁先招供，谁就能拿到减刑。\n你们不能串供，只能赌对方会怎么选。\n嘴硬到底，还是出卖对方？\n\n双方都合作：各+30。\n单人背叛：背叛+50，合作方-20。\n双方背叛：各-30。`,
+    desc: `夜里的审讯室亮着一盏灯，你被带进一间没有窗户的房间。\n桌对面坐着另一个嫌疑人，你们都被指控犯了同一桩案子。\n狱警说：谁先招供，谁就能拿到减刑。\n你们不能串供，只能赌对方会怎么选。\n嘴硬到底，还是出卖对方？\n\n双方合作：各+35。\n单人背叛：背叛+45，合作方-15。\n双方背叛：各-25。`,
     resolve(players, choices) {
       const deltas = {};
       players.forEach(p => deltas[p.id] = 0);
@@ -187,13 +187,13 @@ const EVENTS = [
         const a = players[idx[i]], b = players[idx[i + 1]];
         const ca = choices[a.id], cb = choices[b.id];
         if (ca === '合作' && cb === '合作') {
-          deltas[a.id] += 30; deltas[b.id] += 30;
+          deltas[a.id] += 35; deltas[b.id] += 35;
         } else if (ca === '背叛' && cb === '合作') {
-          deltas[a.id] += 50; deltas[b.id] -= 20;
+          deltas[a.id] += 45; deltas[b.id] -= 15;
         } else if (ca === '合作' && cb === '背叛') {
-          deltas[a.id] -= 20; deltas[b.id] += 50;
+          deltas[a.id] -= 15; deltas[b.id] += 45;
         } else {
-          deltas[a.id] -= 30; deltas[b.id] -= 30;
+          deltas[a.id] -= 25; deltas[b.id] -= 25;
         }
       }
       return { deltas, detail: '配对已随机生成' };
@@ -204,7 +204,7 @@ const EVENTS = [
     name: '众人拾柴的村庄',
     type: 'normal',
     actions: ['投入', '旁观'],
-    desc: `村口的粮仓快空了，村长请大家凑粮食。\n每个人都可以往粮仓里放一份，也可以站在旁边看。\n粮仓里的粮食会翻倍，最后分给所有人。\n有人想：反正别人会凑，我不用出粮；\n也有人想：如果没人凑，全村都要饿肚子。\n村长端着空碗看着大家，等待第一把粮食落进仓里。\n\n投入者先扣20分。\n若投入人数 ≥ 半数：公共总奖励 = 玩家人数 × 20 分，由投入者平分（向下取整），旁观者+10。\n若投入人数 < 半数：投入者-20，旁观者0。\n投入者越多，每人分得越少。`,
+    desc: `村口的粮仓快空了，村长请大家凑粮食。\n每个人都可以往粮仓里放一份，也可以站在旁边看。\n粮仓里的粮食会翻倍，最后分给所有人。\n有人想：反正别人会凑，我不用出粮；\n也有人想：如果没人凑，全村都要饿肚子。\n村长端着空碗看着大家，等待第一把粮食落进仓里。\n\n投入者先扣20分。\n若投入人数 ≥ 半数：公共总奖励 = 玩家人数 × 20 分，由投入者平分（向下取整），旁观者+5。\n若投入人数 < 半数：投入者-20，旁观者0。\n投入者越多，每人分得越少。`,
     resolve(players, choices) {
       const investCount = players.filter(p => choices[p.id] === '投入').length;
               const half = Math.ceil(players.length / 2);
@@ -215,7 +215,7 @@ const EVENTS = [
       const deltas = {};
       players.forEach(p => {
         const invest = choices[p.id] === '投入';
-        deltas[p.id] = invest ? -20 + rewardEach : (success ? 10 : 0);
+        deltas[p.id] = invest ? -20 + rewardEach : (success ? 5 : 0);
       });
       return { deltas, detail: success ? `投入${investCount}人，总奖励${totalReward}，投入者每人分${rewardEach}（扣20后净${rewardEach - 20}），旁观者+10` : `投入人数不足${half}人，投入者-20` };
     }
@@ -225,7 +225,7 @@ const EVENTS = [
     name: '森林里的鹿与兔',
     type: 'normal',
     actions: ['猎鹿', '猎兔'],
-    desc: `隆冬之前的森林，鹿群和兔群同时出现。\n猎鹿需要大家配合，捕兔却总能填饱肚子。\n如果只有一两个人去猎鹿，鹿会跑掉，猎人反而空手而归。\n可如果所有人都去猎鹿，鹿肉又要分给很多人。\n你选猎鹿，还是抓兔？\n\n猎鹿总奖励 = 玩家人数 × 20 - 20。\n猎鹿人数 ≥ 半数：总奖励由猎鹿者平分（向下取整），猎兔者+20。\n猎鹿人数 < 半数：猎鹿者-20，猎兔者+20。\n猎鹿者越多，每人分得越少；全员猎鹿时每人收益低于猎兔。`,
+    desc: `隆冬之前的森林，鹿群和兔群同时出现。\n猎鹿需要大家配合，捕兔却总能填饱肚子。\n如果只有一两个人去猎鹿，鹿会跑掉，猎人反而空手而归。\n可如果所有人都去猎鹿，鹿肉又要分给很多人。\n你选猎鹿，还是抓兔？\n\n猎鹿总奖励 = 玩家人数 × 20 - 20。\n猎鹿人数 ≥ 半数：总奖励由猎鹿者平分（向下取整），猎兔者+15。\n猎鹿人数 < 半数：猎鹿者-20，猎兔者+15。\n猎鹿者越多，每人分得越少；全员猎鹿时每人收益低于猎兔。`,
     resolve(players, choices) {
       const hunters = players.filter(p => choices[p.id] === '猎鹿');
       const half = Math.ceil(players.length / 2);
@@ -235,7 +235,7 @@ const EVENTS = [
       const deltas = {};
       players.forEach(p => {
         if (choices[p.id] === '猎鹿') deltas[p.id] = success ? each : -20;
-        else deltas[p.id] = 20;
+        else deltas[p.id] = 15;
       });
       return { deltas, detail: success ? `猎鹿成功！总价值${total}，${hunters.length}人平分，每人+${each}` : `猎鹿失败，${hunters.length}人猎鹿。` };
     }
@@ -245,14 +245,14 @@ const EVENTS = [
     name: '暴风雨前的灯塔',
     type: 'normal',
     actions: ['站出来', '不站出来'],
-    desc: `海上的暴风雨即将来临，灯塔还亮着。\n只要有人愿意冒着风雨去加固灯塔，整条船的人都能活。\n可谁也不想独自冲进雨里。\n每个人都在等别人先站出来，而雨越来越大，灯塔的光越来越暗。\n\n若只有1人站出来：站出来者-20，不站出来者+20。\n若2人以上站出来：站出来者每人-10，不站出来者+20。\n没人站出来：所有人-50。`,
+    desc: `海上的暴风雨即将来临，灯塔还亮着。\n只要有人愿意冒着风雨去加固灯塔，整条船的人都能活。\n可谁也不想独自冲进雨里。\n每个人都在等别人先站出来，而雨越来越大，灯塔的光越来越暗。\n\n若只有1人站出来：站出来者-20，不站出来者+15。\n若2人以上站出来：站出来者每人-10，不站出来者+15。\n没人站出来：所有人-50。`,
     resolve(players, choices) {
       const volunteers = players.filter(p => choices[p.id] === '站出来');
       const deltas = {};
       if (volunteers.length === 0) {
         players.forEach(p => deltas[p.id] = -50);
       } else {
-        players.forEach(p => deltas[p.id] = choices[p.id] === '站出来' ? (volunteers.length === 1 ? -20 : -10) : 20);
+        players.forEach(p => deltas[p.id] = choices[p.id] === '站出来' ? (volunteers.length === 1 ? -20 : -10) : 15);
       }
       return { deltas, detail: volunteers.length ? `站出来${volunteers.length}人` : '无人站出来' };
     }
@@ -269,7 +269,7 @@ const EVENTS = [
     name: '银行门口的谣言',
     type: 'normal',
     actions: ['继续投资', '撤资'],
-    desc: `城里的钱庄门口围满了人，有人说钱庄要倒了。\n继续把钱存在钱庄的人，如果钱庄撑住，可以分享一百两银子；\n急着把钱取出来的人，虽然不会大赚，但能拿到三十五两保底。\n可取钱的人越多，钱庄就越撑不住。\n\n继续投资人数 ≥ 半数：总奖励 = 玩家人数 × 25 分，由继续投资者平分（向下取整），撤资者+35。\n继续投资人数 < 半数：继续投资者-40，撤资者-10。`,
+    desc: `城里的钱庄门口围满了人，有人说钱庄要倒了。\n继续把钱存在钱庄的人，如果钱庄撑住，可以分享一百两银子；\n急着把钱取出来的人，虽然不会大赚，但能拿到三十五两保底。\n可取钱的人越多，钱庄就越撑不住。\n\n继续投资人数 ≥ 半数：总奖励 = 玩家人数 × 25 分，由继续投资者平分（向下取整），撤资者+30。\n继续投资人数 < 半数：继续投资者-40，撤资者-10。`,
     resolve(players, choices) {
       const withdraw = players.filter(p => choices[p.id] === '撤资');
       const half = Math.ceil(players.length / 2);
@@ -277,10 +277,10 @@ const EVENTS = [
       const deltas = {};
         const continueCount = players.length - withdraw.length;
       players.forEach(p => {
-        if (choices[p.id] === '撤资') deltas[p.id] = crisis ? -10 : 35;
+        if (choices[p.id] === '撤资') deltas[p.id] = crisis ? -10 : 30;
         else deltas[p.id] = crisis ? -40 : Math.floor(players.length * 25 / Math.max(1, continueCount));
       });
-      return { deltas, detail: crisis ? '危机爆发：双方都有损失' : `危机未爆发：继续投资者平分${players.length * 25}，撤资者+35` };
+      return { deltas, detail: crisis ? '危机爆发：双方都有损失' : `危机未爆发：继续投资者平分${players.length * 25}，撤资者+30` };
     }
   }
     ,
@@ -322,7 +322,7 @@ const EVENTS = [
           } else if (ca === '认怂' && cb === '硬刚') {
             deltas[a.id] -= 20; deltas[b.id] += 40;
           } else {
-            deltas[a.id] -= 30; deltas[b.id] -= 30;
+            deltas[a.id] -= 25; deltas[b.id] -= 25;
           }
         }
         return { deltas, detail: '配对已随机生成' };
@@ -379,7 +379,7 @@ const EVENTS = [
       resolve(players, choices) {
         const outputMap = { '低产量': 1, '中产量': 2, '高产量': 3 };
         const total = players.reduce((s, p) => s + (outputMap[choices[p.id]] || 1), 0);
-        const price = Math.max(0, 60 - total * 5);
+        const price = Math.max(0, 65 - total * 5);
         const deltas = {};
         players.forEach(p => {
           const q = outputMap[choices[p.id]] || 1;
@@ -410,7 +410,7 @@ const EVENTS = [
       name: '三次相遇的牢房',
       type: 'repeat',
       actions: ['合作', '背叛'],
-      desc: `同一座牢房，你们要连续见面三次。\n每一次，你们都可以选择合作或者背叛。\n第一次背叛也许能占便宜，但下一次呢？\n对方会记住你做过什么。\n有人说，多次见面的人更容易学会合作；\n也有人说，背叛过一次的人，永远不值得再相信。\n\n随机两两配对，同一对连续打3轮。\n每轮双方同时选择合作或背叛。\n双方合作：各+30；单人背叛：背叛+50，合作-20；双方背叛：各-30。`
+      desc: `同一座牢房，你们要连续见面三次。\n每一次，你们都可以选择合作或者背叛。\n第一次背叛也许能占便宜，但下一次呢？\n对方会记住你做过什么。\n有人说，多次见面的人更容易学会合作；\n也有人说，背叛过一次的人，永远不值得再相信。\n\n随机两两配对，同一对连续打3轮。\n每轮双方同时选择合作或背叛。\n双方合作：各+35；单人背叛：背叛+45，合作-15；双方背叛：各-25。`
     }
     ,
     {
@@ -1020,10 +1020,10 @@ function resolveRepeatRound(room) {
     if (!a || !b) return;
     const ca = room.choices[pair.aId], cb = room.choices[pair.bId];
     let da = 0, db = 0;
-    if (ca === '合作' && cb === '合作') { da = 30; db = 30; }
-    else if (ca === '背叛' && cb === '合作') { da = 50; db = -20; }
-    else if (ca === '合作' && cb === '背叛') { da = -20; db = 50; }
-    else { da = -30; db = -30; }
+    if (ca === '合作' && cb === '合作') { da = 35; db = 35; }
+    else if (ca === '背叛' && cb === '合作') { da = 45; db = -15; }
+    else if (ca === '合作' && cb === '背叛') { da = -15; db = 45; }
+    else { da = -25; db = -25; }
     deltas[pair.aId] = da;
     deltas[pair.bId] = db;
     lines.push(`${a.name}【${ca}】 vs ${b.name}【${cb}】：${a.name}${da>=0?'+':''}${da}，${b.name}${db>=0?'+':''}${db}`);
