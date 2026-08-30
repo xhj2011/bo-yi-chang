@@ -1175,9 +1175,25 @@ function startChoice(room) {
   }
 }
 
+function applyHardModifier(room, result) {
+  if (room.difficulty !== 'hard') return result;
+  const mods = [
+    { name: '市场恐慌', delta: -5 },
+    { name: '意外之财', delta: 5 },
+    { name: '奖励波动', delta: 3 },
+    { name: '成本上升', delta: -3 }
+  ];
+  const mod = mods[Math.floor(Math.random() * mods.length)];
+  room.players.forEach(p => {
+    result.deltas[p.id] = (result.deltas[p.id] || 0) + mod.delta;
+  });
+  result.detail = (result.detail || '') + `\n【困难随机事件】${mod.name}：全员${mod.delta > 0 ? '+' : ''}${mod.delta}分`;
+  return result;
+}
+
 function resolveNormal(room) {
   const event = room.currentEvent;
-  const result = event.resolve(room.players, room.choices);
+  const result = applyHardModifier(room, event.resolve(room.players, room.choices));
   room.players.forEach(p => {
     p.score += result.deltas[p.id] || 0;
   });
@@ -1297,7 +1313,13 @@ function handleMessage(ws, msg) {
     }
     case 'start': {
       if (room && room.hostId === ws.playerId && room.phase === 'waiting' && room.players.length >= 2) {
-        room.deck = shuffle(EVENTS.filter(e => e.id !== 'chicken' && e.id !== 'commons' && e.id !== 'centipede' && e.id !== 'rps')).slice(0, 6);
+        room.difficulty = ['easy', 'normal', 'hard'].includes(msg.difficulty) ? msg.difficulty : 'normal';
+        let pool = EVENTS.filter(e => e.id !== 'chicken' && e.id !== 'commons' && e.id !== 'centipede' && e.id !== 'rps');
+        if (room.difficulty === 'easy') {
+          const easyIds = new Set(['prisoner', 'public', 'stag', 'volunteer', 'trust', 'minority']);
+          pool = pool.filter(e => easyIds.has(e.id));
+        }
+        room.deck = shuffle(pool).slice(0, 6);
         room.roundIndex = 0;
         startRound(room);
       }

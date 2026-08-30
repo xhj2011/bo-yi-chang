@@ -895,8 +895,16 @@ function renderLobby() {
   const area = document.getElementById('startArea');
   area.innerHTML = '';
   if (host) {
-    area.innerHTML = `<button onclick="send({type:'addBot'})">添加机器人</button>
-      <button onclick="send({type:'start'})">开始游戏</button><br>
+    area.innerHTML = `<div class="row" style="justify-content:center; margin-bottom:6px;">
+        <label style="color:#cbd5e1;">难度：</label>
+        <select id="difficultySelect" style="width:130px; background:#0f172a; color:#fff; border:1px solid #475569; border-radius:10px; padding:6px 10px;">
+          <option value="easy">简单</option>
+          <option value="normal" selected>普通</option>
+          <option value="hard">困难</option>
+        </select>
+      </div>
+      <button onclick="send({type:'addBot'})">添加机器人</button>
+      <button onclick="startGame()">开始游戏</button><br>
       <span class="link"></span>`;
   } else {
     area.innerHTML = '<span class="link">等待房主开始游戏…</span>';
@@ -1122,6 +1130,12 @@ window.ultimatumRespond = function (accept) {
   send({ type: 'ultimatumRespond', accept });
   renderGame();
 };
+
+function startGame() {
+  const select = document.getElementById('difficultySelect');
+  const difficulty = select ? select.value : 'normal';
+  send({ type: 'start', difficulty });
+}
 
 function hostNext() {
   if (host) send({ type: 'nextRound' });
