@@ -667,6 +667,7 @@ let ultimatumRole = 'watch';
 let ultimatumAnswered = null;
 let readConfirmed = false;
 let myTrait = null;
+let mySkillUsed = false;
 let readingInfo = { read: 0, total: 0 };
 
 function connect() {
@@ -744,6 +745,7 @@ function handle(msg) {
       ultimatumAnswered = null;
       readConfirmed = false;
       myTrait = null;
+      mySkillUsed = false;
       readingInfo = { read: 0, total: (msg.players || []).length };
         scoreAnimated = false;
       document.getElementById('lobby').classList.add('hidden');
@@ -762,6 +764,7 @@ function handle(msg) {
     case 'traitSelect': {
       phase = 'trait_select';
       myTrait = null;
+      mySkillUsed = false;
       window._traits = msg.traits || [];
       window._traitProgress = { done: 0, total: (msg.players || []).length };
       renderGame();
@@ -937,6 +940,13 @@ function renderGame() {
   const body = document.getElementById('gameBody');
   let html = '';
   if (myTrait) html += `<div class="phase" style="color:#a5b4fc;">🂠 你的隐藏身份：${escapeHtml(myTrait.name)}（${escapeHtml(myTrait.desc)}）</div>`;
+  if (myTrait && myTrait.skill && phase !== 'trait_select') {
+    if (mySkillUsed) {
+      html += `<p class="link">身份技能已使用：${escapeHtml(myTrait.skill.name)}</p>`;
+    } else {
+      html += `<button onclick="useSkill()" class="secondary">使用技能：${escapeHtml(myTrait.skill.name)}</button>`;
+    }
+  }
   if (phase === 'trait_select') {
     const traits = window._traits || [];
     const progress = window._traitProgress || { done: 0, total: 0 };
@@ -1139,6 +1149,12 @@ window.centipedeAction = function (action) {
 
 }
 
+function useSkill() {
+  if (!myTrait || !myTrait.skill || mySkillUsed) return;
+  mySkillUsed = true;
+  send({ type: 'useSkill' });
+  renderGame();
+}
 function selectTrait(id) {
   const t = (window._traits || []).find(x => x.id === id);
   if (!t) return;

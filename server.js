@@ -6,10 +6,10 @@ const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const TRAITS = [
-  { id: 'aggressive', name: '激进者', desc: '收益额外+10，损失额外-10' },
-  { id: 'conservative', name: '保守者', desc: '收益-5，损失+5' },
-  { id: 'lucky', name: '幸运儿', desc: '每次结算随机浮动-5~+8' },
-  { id: 'steady', name: '稳健者', desc: '收益+4，损失-4' }
+  { id: 'aggressive', name: '激进者', desc: '你赚的时候多赚10分；你赔的时候再多赔10分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
+  { id: 'conservative', name: '保守者', desc: '你赚的时候少赚5分；你赔的时候少赔5分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
+  { id: 'lucky', name: '幸运儿', desc: '每次结算在原本结果上随机浮动-5到+8分', skill: { id: 'destiny', name: '天命', desc: '本轮额外获得0~12分' } },
+  { id: 'steady', name: '稳健者', desc: '你赚的时候多赚4分；你赔的时候少赔4分', skill: { id: 'steady_gain', name: '稳赚', desc: '本轮固定额外+8分' } }
 ];
 
 
@@ -500,6 +500,7 @@ function startRound(room) {
   clearTimeout(room.discussionTimer);
   room.readConfirmed = {};
   room.phase = 'reading';
+  room.activeSkillEffects = {};
   room.choices = {};
   room.currentEvent = room.deck[room.roundIndex];
   room.ultimatum = null;
@@ -1348,6 +1349,21 @@ function applyTrait(room, result) {
   return result;
 }
 
+function applyActiveSkills(room, result) {
+  if (!room.activeSkillEffects) return result;
+  room.players.forEach(p => {
+    const skillId = room.activeSkillEffects[p.id];
+    if (!skillId) return;
+    let d = result.deltas[p.id] || 0;
+    if (skillId === 'all_in') d = Math.round(d * 1.5);
+    else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d;
+    else if (skillId === 'destiny') d += Math.floor(Math.random() * 13);
+    else if (skillId === 'steady_gain') d += 8;
+    result.deltas[p.id] = d;
+  });
+  return result;
+}
+
 function applyHardModifier(room, result) {
   if (room.difficulty !== 'hard') return result;
   const mods = [
@@ -1371,6 +1387,7 @@ function resolveNormal(room) {
     result = room.twist.apply(room, result) || result;
   }
   result = applyTrait(room, applyHardModifier(room, result));
+  result = applyActiveSkills(room, result);
   room.players.forEach(p => {
     p.score += result.deltas[p.id] || 0;
   });
@@ -1500,6 +1517,8 @@ function handleMessage(ws, msg) {
         room.deck = shuffle(pool).slice(0, 6);
         room.roundIndex = 0;
         if (room.difficulty === 'hard') {
+          room.usedSkills = {};
+          room.activeSkillEffects = {};
           room.phase = 'trait_select';
           broadcast(room, { type: 'traitSelect', traits: TRAITS, players: publicPlayers(room) });
           room.players.forEach(p => {
@@ -1532,6 +1551,18 @@ function handleMessage(ws, msg) {
       sendTo(room, player.id, { type: 'trait', trait });
       broadcast(room, { type: 'traitProgress', done: Object.keys(room.traits).length, total: room.players.length });
       checkTraitSelection(room);
+      break;
+    }
+    case 'useSkill': {
+      if (!room || room.difficulty !== 'hard' || !room.traits) return;
+      const player = room.players.find(p => p.id === ws.playerId);
+      if (!player) return;
+      const trait = room.traits[player.id];
+      if (!trait || !trait.skill) return;
+      if (room.usedSkills[player.id]) return;
+      room.usedSkills[player.id] = true;
+      room.activeSkillEffects[player.id] = trait.skill.id;
+      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 使用了身份技能：${trait.skill.name}` });
       break;
     }
     case 'confirmRead': {
