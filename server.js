@@ -8,10 +8,16 @@ const PORT = process.env.PORT || 3000;
 const TRAITS = [
   { id: 'berserker', name: '狂战士', desc: '收益+20%，损失+20%', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益/损失×1.5，风险事件×2' } },
   { id: 'raider', name: '掠夺者', desc: '背叛/进攻收益+15%，合作收益-5%', skill: { id: 'aggr_bonus', name: '掠夺', desc: '本轮背叛/进攻收益再+20%' } },
+  { id: 'breaker', name: '破军', desc: '风险事件收益+15%', skill: { id: 'breakthrough', name: '破釜沉舟', desc: '本轮收益×1.5' } },
+  { id: 'daredevil', name: '赌命者', desc: '收益为正+10%，为负再-10%', skill: { id: 'double_or_nothing', name: '赌命', desc: '50%收益×2 / 50%损失×2' } },
   { id: 'miser', name: '守财奴', desc: '收益-10%，损失-10%', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
-  { id: 'ironwall', name: '铁壁', desc: '单轮损失最多-15分', skill: { id: 'shield_wall', name: '绝对防御', desc: '本轮损失最多-5分' } },
+  { id: 'ironwall', name: '铁壁', desc: '单轮损失最多-20分', skill: { id: 'shield_wall', name: '绝对防御', desc: '本轮损失最多-10分' } },
+  { id: 'steady_earner', name: '稳赚者', desc: '每轮额外+3', skill: { id: 'steady_gain', name: '稳赚', desc: '本轮额外+8' } },
+  { id: 'safe_harbor', name: '避风港', desc: '免疫全局随机波动', skill: { id: 'safe_haven', name: '避风', desc: '本轮损失最多-8分' } },
   { id: 'gambler', name: '赌徒', desc: '收益随机±20%', skill: { id: 'destiny', name: '豪赌', desc: '50% +30% / 50% -20%' } },
   { id: 'chosen', name: '天选者', desc: '收益随机0~+15%', skill: { id: 'blessing', name: '天命', desc: '本轮额外+20%' } },
+  { id: 'madman', name: '疯子', desc: '收益随机-25%～+35%', skill: { id: 'crazy', name: '疯狂', desc: '本轮随机-30%～+50%' } },
+  { id: 'fate_gambler', name: '命运赌徒', desc: '20%概率收益×1.5', skill: { id: 'fate_roll', name: '赌命', desc: '50% +25 / 50% -15分' } },
   { id: 'spy', name: '间谍', desc: '复杂事件中额外+6', skill: { id: 'peek', name: '窥探', desc: '随机查看一名其他玩家的身份，并获得+4' } },
   { id: 'info_broker', name: '情报商', desc: '开局额外+1情报行动', skill: { id: 'forge', name: '编造假情报', desc: '随机生成一条假公开信息' } },
   { id: 'censor', name: '审查者', desc: '可以看到被修改过的信息', skill: { id: 'block', name: '阻止公开', desc: '随机一名玩家本轮不能发布信息' } },
@@ -1438,23 +1444,19 @@ function applyIdentityToDeltas(room, deltas) {
     if (!trait) return;
     const isCoop = coopSet.includes(room.choices[p.id]);
     let d = deltas[p.id] || 0;
-    if (trait.id === 'berserker') {
-      deltas[p.id] = Math.round(d * 1.2);
-    } else if (trait.id === 'raider') {
-      if (coopSet.length) deltas[p.id] = isCoop ? Math.round(d * 0.95) : Math.round(d * 1.15);
-    } else if (trait.id === 'miser') {
-      deltas[p.id] = Math.round(d * 0.9);
-    } else if (trait.id === 'ironwall') {
-      deltas[p.id] = Math.max(d, -15);
-    } else if (trait.id === 'gambler') {
-      const mult = 0.8 + Math.random() * 0.4;
-      deltas[p.id] = Math.round(d * mult);
-    } else if (trait.id === 'chosen') {
-      const mult = 1 + Math.random() * 0.15;
-      deltas[p.id] = Math.round(d * mult);
-    } else if (trait.id === 'spy') {
-      if (risk) deltas[p.id] = d + 6;
-    }
+    if (trait.id === 'berserker') deltas[p.id] = Math.round(d * 1.2);
+    else if (trait.id === 'raider' && coopSet.length) deltas[p.id] = isCoop ? Math.round(d * 0.95) : Math.round(d * 1.15);
+    else if (trait.id === 'breaker' && risk) deltas[p.id] = Math.round(d * 1.15);
+    else if (trait.id === 'daredevil') deltas[p.id] = Math.round(d * 1.1);
+    else if (trait.id === 'miser') deltas[p.id] = Math.round(d * 0.9);
+    else if (trait.id === 'ironwall') deltas[p.id] = Math.max(d, -20);
+    else if (trait.id === 'steady_earner') deltas[p.id] = d + 3;
+    else if (trait.id === 'safe_harbor') { /* 免疫随机在 applyHardModifier 处理 */ }
+    else if (trait.id === 'gambler') deltas[p.id] = Math.round(d * (0.8 + Math.random() * 0.4));
+    else if (trait.id === 'chosen') deltas[p.id] = Math.round(d * (1 + Math.random() * 0.15));
+    else if (trait.id === 'madman') deltas[p.id] = Math.round(d * (0.75 + Math.random() * 0.6));
+    else if (trait.id === 'fate_gambler') deltas[p.id] = Math.random() < 0.2 ? Math.round(d * 1.5) : d;
+    else if (trait.id === 'spy' && risk) deltas[p.id] = d + 6;
   });
   if (room.activeSkillEffects) {
     room.players.forEach(p => {
@@ -1464,10 +1466,16 @@ function applyIdentityToDeltas(room, deltas) {
       let d = deltas[p.id] || 0;
       if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
       else if (skillId === 'aggr_bonus' && coopSet.length && !isCoop) d += Math.round(d * 0.2);
+      else if (skillId === 'breakthrough') d = d > 0 ? Math.round(d * 1.5) : d;
+      else if (skillId === 'double_or_nothing') d = Math.round(d * (Math.random() < 0.5 ? 2 : 0.5));
       else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + 2;
-      else if (skillId === 'shield_wall') d = Math.max(d, -5);
+      else if (skillId === 'shield_wall') d = Math.max(d, -10);
+      else if (skillId === 'steady_gain') d += 8;
+      else if (skillId === 'safe_haven') d = Math.max(d, -8);
       else if (skillId === 'destiny') d = Math.round(d * (Math.random() < 0.5 ? 1.3 : 0.8));
       else if (skillId === 'blessing') d = d > 0 ? d + Math.round(d * 0.2) : d;
+      else if (skillId === 'crazy') d = Math.round(d * (0.7 + Math.random() * 0.8));
+      else if (skillId === 'fate_roll') d += (Math.random() < 0.5 ? 25 : -15);
       else if (skillId === 'peek') d += 4;
       deltas[p.id] = d;
     });
@@ -1497,8 +1505,9 @@ function applyHardModifier(room, result) {
   room.players.forEach(p => {
     const trait = room.traits && room.traits[p.id];
     const isSteady = trait && trait.id === 'steady';
+    const isSafe = trait && trait.id === 'safe_harbor';
     const isLocked = room.activeSkillEffects && room.activeSkillEffects[p.id] === 'steady_gain';
-    if (isSteady || isLocked) return;
+    if (isSteady || isLocked || isSafe) return;
     result.deltas[p.id] = (result.deltas[p.id] || 0) + mod.delta;
   });
   result.detail = (result.detail || '') + `\n【困难随机事件】${mod.name}：全员${mod.delta > 0 ? '+' : ''}${mod.delta}分`;
@@ -1692,6 +1701,7 @@ function handleMessage(ws, msg) {
     case 'useSkill': {
       if (!room || room.difficulty !== 'hard' || !room.traits) return;
       const player = room.players.find(p => p.id === ws.playerId);
+      if (!['reading','discussion'].includes(room.phase)) return;
       if (!player) return;
       const trait = room.traits[player.id];
       if (!trait || !trait.skill) return;
