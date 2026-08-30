@@ -25,18 +25,20 @@ const COOP_ACTIONS = {
 const STRATEGY_CARDS = [
   { id: 'shield', name: '保险', rarity: 'common', color: '#94a3b8', desc: '本轮你的损失减半', effect: 'shield' },
   { id: 'focus', name: '专注', rarity: 'common', color: '#94a3b8', desc: '本轮额外+3', effect: 'focus' },
-  { id: 'boost', name: '加注', rarity: 'rare', color: '#60a5fa', desc: '本轮收益+5', effect: 'boost' },
+  { id: 'small_gain', name: '小赚', rarity: 'common', color: '#94a3b8', desc: '本轮额外+4', effect: 'small_gain' },
+  { id: 'stop_loss', name: '止损', rarity: 'common', color: '#94a3b8', desc: '本轮亏损最多-5', effect: 'stop_loss' },
+  { id: 'boost', name: '加注', rarity: 'common', color: '#94a3b8', desc: '本轮收益+5', effect: 'boost' },
   { id: 'disrupt', name: '干扰', rarity: 'rare', color: '#60a5fa', desc: '随机一名其他玩家本轮-3', effect: 'disrupt' },
-  { id: 'gamble', name: '豪赌', rarity: 'epic', color: '#c084fc', desc: '本轮随机-5~+15', effect: 'gamble' },
   { id: 'coop_card', name: '合作卡', rarity: 'rare', color: '#60a5fa', desc: '本轮如果选择合作类行动，收益+10', effect: 'coop_bonus' },
   { id: 'aggr_card', name: '进攻卡', rarity: 'rare', color: '#f87171', desc: '本轮如果选择背叛/进攻类行动，收益+10', effect: 'aggr_bonus' },
-  { id: 'prisoner_letter', name: '狱中密信', event: 'prisoner', rarity: 'rare', color: '#60a5fa', desc: '囚徒困境：本轮合作收益+12', effect: 'coop_bonus' },
-  { id: 'public_support', name: '村长支持', event: 'public', rarity: 'rare', color: '#60a5fa', desc: '公共品：本轮投入收益+12', effect: 'coop_bonus' },
-  { id: 'stag_track', name: '追踪术', event: 'stag', rarity: 'rare', color: '#60a5fa', desc: '猎鹿：本轮猎鹿收益+12', effect: 'coop_bonus' },
-  { id: 'volunteer_lamp', name: '守夜人', event: 'volunteer', rarity: 'rare', color: '#60a5fa', desc: '灯塔：本轮站出来收益+12', effect: 'coop_bonus' },
-  { id: 'trust_help', name: '央行支持', event: 'trust', rarity: 'rare', color: '#60a5fa', desc: '银行：本轮继续投资收益+12', effect: 'coop_bonus' },
+  { id: 'gamble', name: '豪赌', rarity: 'epic', color: '#c084fc', desc: '本轮随机-5~+15', effect: 'gamble' },
+  { id: 'prisoner_letter', name: '狱中密信', event: 'prisoner', rarity: 'common', color: '#94a3b8', desc: '囚徒困境：本轮合作收益+12', effect: 'coop_bonus' },
+  { id: 'public_support', name: '村长支持', event: 'public', rarity: 'common', color: '#94a3b8', desc: '公共品：本轮投入收益+12', effect: 'coop_bonus' },
+  { id: 'stag_track', name: '追踪术', event: 'stag', rarity: 'common', color: '#94a3b8', desc: '猎鹿：本轮猎鹿收益+12', effect: 'coop_bonus' },
+  { id: 'volunteer_lamp', name: '守夜人', event: 'volunteer', rarity: 'common', color: '#94a3b8', desc: '灯塔：本轮站出来收益+12', effect: 'coop_bonus' },
+  { id: 'trust_help', name: '央行支持', event: 'trust', rarity: 'common', color: '#94a3b8', desc: '银行：本轮继续投资收益+12', effect: 'coop_bonus' },
   { id: 'minority_oracle', name: '先知', event: 'minority', rarity: 'epic', color: '#c084fc', desc: '少数者：如果你在少数方，额外+15', effect: 'minority_bonus' },
-  { id: 'cournot_dump', name: '低价倾销', event: 'cournot', rarity: 'rare', color: '#60a5fa', desc: '古诺：本轮低产量收益+12', effect: 'coop_bonus' }
+  { id: 'cournot_dump', name: '低价倾销', event: 'cournot', rarity: 'common', color: '#94a3b8', desc: '古诺：本轮低产量收益+12', effect: 'coop_bonus' }
 ];
 const EVENT_TWISTS = {
   public: [
@@ -1378,6 +1380,8 @@ function applyStrategyCards(room, deltas) {
     if (card.effect === 'shield') d = d < 0 ? Math.round(d / 2) : d;
     else if (card.effect === 'focus') d += 3;
     else if (card.effect === 'boost') d += 5;
+    else if (card.effect === 'small_gain') d += 4;
+    else if (card.effect === 'stop_loss') d = d < 0 ? Math.max(d, -5) : d;
     else if (card.effect === 'gamble') d += (Math.floor(Math.random() * 21) - 5);
     else if (card.effect === 'coop_bonus' && coopSet.includes(room.choices[p.id])) d += 10;
     else if (card.effect === 'aggr_bonus' && coopSet.length && !coopSet.includes(room.choices[p.id])) d += 10;
