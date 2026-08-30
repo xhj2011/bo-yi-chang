@@ -358,6 +358,7 @@ function addBot(room) {
 
 
 function startRound(room) {
+  clearTimeout(room.discussionTimer);
   room.readConfirmed = {};
   room.phase = 'reading';
   room.choices = {};
@@ -387,7 +388,13 @@ function checkReadingComplete(room) {
   if (room.players.every(p => room.readConfirmed[p.id])) {
     room.phase = 'discussion';
     room.discussionStart = Date.now();
-    broadcast(room, { type: 'discussionOpen', players: publicPlayers(room), minDiscussMs: 30000 });
+    room.chatCounts = {};
+    room.players.forEach(p => room.chatCounts[p.id] = 0);
+    clearTimeout(room.discussionTimer);
+    room.discussionTimer = setTimeout(() => {
+      if (room.phase === 'discussion') startChoice(room);
+    }, 120000);
+    broadcast(room, { type: 'discussionOpen', players: publicPlayers(room), minDiscussMs: 30000, maxDiscussMs: 120000 });
   }
 }
 
@@ -1113,8 +1120,23 @@ function resolveAuction(room) {
 
 
 
+function grantDiscussionReward(room) {
+  if (!room.chatCounts) return;
+  const active = room.players.filter(p => (room.chatCounts[p.id] || 0) >= 2);
+  if (!active.length) return;
+  const winners = shuffle(active).slice(0, Math.min(2, active.length));
+  const reward = 3;
+  const names = [];
+  winners.forEach(p => {
+    p.score += reward;
+    names.push(p.name);
+  });
+  broadcast(room, { type: 'chat', name: '系统', text: `🎉 讨论活跃奖励：${names.join('、')} 各 +${reward} 分` });
+}
 function startChoice(room) {
   if (room.phase !== 'discussion') return;
+  clearTimeout(room.discussionTimer);
+  grantDiscussionReward(room);
   if (room.currentEvent.type === 'duel') {
       startDuel(room);
     } else if (room.currentEvent.type === 'centipede') {
@@ -1427,6 +1449,9 @@ function handleMessage(ws, msg) {
       const player = room.players.find(p => p.id === ws.playerId);
       if (!player) return;
       const text = String(msg.text || '').slice(0, 200);
+      if (room.phase === 'discussion' && room.chatCounts) {
+        room.chatCounts[player.id] = (room.chatCounts[player.id] || 0) + 1;
+      }
       broadcast(room, { type: 'chat', name: player.name, text });
       break;
     }

@@ -918,7 +918,8 @@ function renderGame() {
     html += `<div class="phase">自由讨论阶段</div>
       <p>现在可以尽情讨论：承诺、威胁、撒谎、商量策略。</p>
       <p class="link">💬 讨论提示：试着问对方“合作还是背叛？”，也可以许诺、威胁、试探。</p>
-      <p class="link">建议至少讨论 30 秒后再开始选择。</p>`;
+      <p class="link">建议至少讨论 30 秒后再开始选择。</p>
+      <p class="link">最长 2 分钟后会自动进入选择阶段。</p>`;
     if (host) {
       html += `<button onclick="send({type:'startChoice'})">开始本轮选择</button>`;
     } else {
