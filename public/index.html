@@ -666,6 +666,7 @@ let scoreAnimated = false;
 let ultimatumRole = 'watch';
 let ultimatumAnswered = null;
 let readConfirmed = false;
+let myTrait = null;
 let readingInfo = { read: 0, total: 0 };
 
 function connect() {
@@ -742,6 +743,7 @@ function handle(msg) {
       ultimatumOpponent = null;
       ultimatumAnswered = null;
       readConfirmed = false;
+      myTrait = null;
       readingInfo = { read: 0, total: (msg.players || []).length };
         scoreAnimated = false;
       document.getElementById('lobby').classList.add('hidden');
@@ -753,6 +755,11 @@ function handle(msg) {
       document.getElementById('eventRule').textContent = currentEvent.desc;
       renderGame();
       renderScores();
+      break;
+    }
+    case 'trait': {
+      myTrait = msg.trait || null;
+      renderGame();
       break;
     }
     case 'discussionOpen': {
@@ -914,6 +921,7 @@ function renderLobby() {
 function renderGame() {
   const body = document.getElementById('gameBody');
   let html = '';
+  if (myTrait) html += `<div class="phase" style="color:#a5b4fc;">🂠 你的隐藏身份：${escapeHtml(myTrait.name)}（${escapeHtml(myTrait.desc)}）</div>`;
   if (phase === 'reading') {
     html += `<div class="phase">阅读阶段 · 已确认 ${readingInfo.read}/${readingInfo.total}</div>
       <p>请先仔细阅读上方规则，确认理解后再进入讨论。</p>`;

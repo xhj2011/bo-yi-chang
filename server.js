@@ -5,6 +5,13 @@ const crypto = require('crypto');
 const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
+const TRAITS = [
+  { id: 'aggressive', name: '激进者', desc: '收益额外+5，损失额外-5' },
+  { id: 'conservative', name: '保守者', desc: '收益-3，损失+3' },
+  { id: 'lucky', name: '幸运儿', desc: '每次结算随机浮动-2~+4' },
+  { id: 'steady', name: '稳健者', desc: '收益+2，损失-2' }
+];
+
 
 const EVENTS = [
   {
@@ -376,6 +383,12 @@ function startRound(room) {
     event: publicEvent(room.currentEvent),
     players: publicPlayers(room)
   });
+  if (room.difficulty === 'hard' && room.traits) {
+    room.players.forEach(p => {
+      const t = room.traits[p.id];
+      if (t) sendTo(room, p.id, { type: 'trait', trait: t });
+    });
+  }
   // Bots automatically finish reading; humans click “我已读完”.
   room.players.forEach(p => {
     if (p.isBot) room.readConfirmed[p.id] = true;
@@ -1175,6 +1188,20 @@ function startChoice(room) {
   }
 }
 
+function applyTrait(room, result) {
+  if (room.difficulty !== 'hard' || !room.traits) return result;
+  room.players.forEach(p => {
+    const trait = room.traits[p.id];
+    if (!trait) return;
+    const d = result.deltas[p.id] || 0;
+    if (trait.id === 'aggressive') result.deltas[p.id] = d > 0 ? d + 5 : d - 5;
+    else if (trait.id === 'conservative') result.deltas[p.id] = d > 0 ? d - 3 : d + 3;
+    else if (trait.id === 'lucky') result.deltas[p.id] = d + (Math.floor(Math.random() * 7) - 2);
+    else if (trait.id === 'steady') result.deltas[p.id] = d > 0 ? d + 2 : d - 2;
+  });
+  return result;
+}
+
 function applyHardModifier(room, result) {
   if (room.difficulty !== 'hard') return result;
   const mods = [
@@ -1193,7 +1220,7 @@ function applyHardModifier(room, result) {
 
 function resolveNormal(room) {
   const event = room.currentEvent;
-  const result = applyHardModifier(room, event.resolve(room.players, room.choices));
+  const result = applyTrait(room, applyHardModifier(room, event.resolve(room.players, room.choices)));
   room.players.forEach(p => {
     p.score += result.deltas[p.id] || 0;
   });
@@ -1314,6 +1341,13 @@ function handleMessage(ws, msg) {
     case 'start': {
       if (room && room.hostId === ws.playerId && room.phase === 'waiting' && room.players.length >= 2) {
         room.difficulty = ['easy', 'normal', 'hard'].includes(msg.difficulty) ? msg.difficulty : 'normal';
+        room.traits = null;
+        if (room.difficulty === 'hard') {
+          room.traits = {};
+          room.players.forEach(p => {
+            room.traits[p.id] = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+          });
+        }
         let pool = EVENTS.filter(e => e.id !== 'chicken' && e.id !== 'commons' && e.id !== 'centipede' && e.id !== 'rps');
         if (room.difficulty === 'easy') {
           const easyIds = new Set(['prisoner', 'public', 'stag', 'volunteer', 'trust', 'minority']);
