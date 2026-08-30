@@ -502,13 +502,13 @@
       margin-top: 14px;
     }
     #game {
-      min-height: 520px;
-      padding: 50px 20px;
+      min-height: 560px;
+      padding: 70px 24px;
     }
     #scorePanel,
   #scorePanel.panel {
       inset: 28px 18px 28px 18px;
-      z-index: 20;
+
     }
     .score {
       width: 64px;
@@ -526,7 +526,7 @@
     }
     #eventRule {
       max-width: none;
-      margin: 0 6px;
+      margin: 0 30px;
       padding: 12px;
       font-size: 14px;
     }
@@ -549,13 +549,13 @@
 
   @media (max-width: 480px) {
     #game {
-      min-height: 470px;
-      padding: 42px 12px;
+      min-height: 520px;
+      padding: 58px 14px;
     }
     #scorePanel,
   #scorePanel.panel {
       inset: 22px 10px 22px 10px;
-      z-index: 20;
+
     }
     .score {
       width: 56px;
@@ -983,10 +983,16 @@ function renderGame() {
         <p class="link">超过半数同意则通过；否则提案者扣50，换下一个人。</p>`;
     }
     else if (phase === 'auction_bid') {
-      html += `<div class="phase">全支付拍卖 · 秘密出价</div>
-        <div class="row"><input type="range" min="0" max="200" value="50" id="auctionBidRange" style="width:280px;"><span id="auctionBidVal">50</span>分</div>
-        <button onclick="auctionBid()">提交出价</button>
-        <p class="link">所有人都会支付这次出价；最高价者获得奖励 = 玩家人数 × 20 分。</p>`;
+      if (myBid != null) {
+        html += `<div class="phase">全支付拍卖 · 秘密出价</div>
+          <p>你已出价：${myBid} 分</p>
+          <p class="link">等待其他玩家出价…</p>`;
+      } else {
+        html += `<div class="phase">全支付拍卖 · 秘密出价</div>
+          <div class="row"><input type="range" min="0" max="200" value="50" id="auctionBidRange" style="width:280px;"><span id="auctionBidVal">50</span>分</div>
+          <button onclick="auctionBid()">提交出价</button>
+          <p class="link">所有人都会支付这次出价；最高价者获得奖励 = 玩家人数 × 20 分。</p>`;
+      }
     }
 
 
@@ -1056,6 +1062,7 @@ window.centipedeAction = function (action) {
     renderGame();
   }
   window.auctionBid = function () {
+    if (myBid != null) return;
     const val = document.getElementById('auctionBidRange')?.value || 0;
     myBid = parseInt(val);
     send({ type: 'auctionBid', bid: myBid });
