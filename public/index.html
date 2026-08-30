@@ -647,6 +647,11 @@
       <button onclick="sendChat()">发送</button>
     </div>
   </div>
+  <!-- 情报板 -->
+  <div id="infoBoard" class="panel hidden">
+    <h3>📋 情报板</h3>
+    <div id="infoBoardList"></div>
+  </div>
 </div>
 
 <script>
@@ -791,13 +796,13 @@ function handle(msg) {
       break;
     }
     case 'publicInfo': {
-      const info = msg.info || {};
-      let text = `${info.name} 公开了信息：`;
-      if (info.trait) text += `身份=${info.trait.name}；`;
-      if (info.skill) text += `技能=${info.skill.name}；`;
-      if (info.card) text += `策略卡=${info.card.name}；`;
-      text += `当前分数=${info.score}`;
-      appendChat('系统', text);
+      window._infoBoard = window._infoBoard || {};
+      const pid = msg.playerId;
+      if (!window._infoBoard[pid]) window._infoBoard[pid] = { name: msg.name, identity: null, skill: null, score: null };
+      window._infoBoard[pid][msg.category] = { value: msg.value, modified: false };
+      const catName = msg.category === 'identity' ? '身份' : msg.category === 'skill' ? '技能' : '分数';
+      appendChat('系统', `【情报板】${msg.name} 公布${catName}：${msg.value}`);
+      renderInfoBoard();
       break;
     }
     case 'cardHand': {
@@ -994,6 +999,9 @@ function renderGame() {
     }
   }
   if (myTrait) html += `<button onclick="revealMyInfo()" class="secondary">公开我的所有信息</button>`;
+  if (myTrait && phase !== 'trait_select') html += `<button onclick="publishInfo('identity')" class="secondary">公布身份</button>`;
+  if (myTrait && (phase === 'reading' || phase === 'discussion' || phase === 'choosing')) html += `<button onclick="publishInfo('skill')" class="secondary">公布技能/策略</button>`;
+  if (phase === 'reveal') html += `<button onclick="publishInfo('score')" class="secondary">公布分数</button>`;
   if (phase === 'trait_select') {
     const traits = window._traits || [];
     const progress = window._traitProgress || { done: 0, total: 0 };
@@ -1203,6 +1211,9 @@ function selectStrategyCard(cardId) {
   send({ type: 'selectCard', cardId });
   renderGame();
 }
+function publishInfo(category) {
+  send({ type: 'publishInfo', category });
+}
 function revealMyInfo() {
   send({ type: 'revealMyInfo' });
 }
@@ -1398,6 +1409,25 @@ function eventIcon(id) {
     allpay: '🔨'
   };
   return icons[id] || '🎲';
+}
+function renderInfoBoard() {
+  const board = document.getElementById('infoBoard');
+  const list = document.getElementById('infoBoardList');
+  if (!board || !list) return;
+  const data = window._infoBoard || {};
+  const ids = Object.keys(data);
+  if (!ids.length) { board.classList.add('hidden'); list.innerHTML = ''; return; }
+  board.classList.remove('hidden');
+  let html = '';
+  ids.forEach(id => {
+    const e = data[id];
+    const lines = [];
+    if (e.identity) lines.push(`身份：${escapeHtml(e.identity.value)}${e.identity.modified ? ' ⚠️' : ''}`);
+    if (e.skill) lines.push(`技能：${escapeHtml(e.skill.value)}${e.skill.modified ? ' ⚠️' : ''}`);
+    if (e.score != null) lines.push(`分数：${e.score.value}${e.score.modified ? ' ⚠️' : ''}`);
+    html += `<div><b>${escapeHtml(e.name || '')}</b>：${lines.join('；') || '暂无'}</div>`;
+  });
+  list.innerHTML = html;
 }
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

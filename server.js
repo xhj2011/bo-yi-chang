@@ -1645,6 +1645,8 @@ function handleMessage(ws, msg) {
         if (room.difficulty === 'hard') {
           room.usedSkills = {};
   room.revealedInfo = {};
+  room.publicInfo = {};
+  room.infoActions = {};
           room.activeSkillEffects = {};
   room.activeSkillTargets = {};
           room.phase = 'trait_select';
@@ -1726,6 +1728,38 @@ function handleMessage(ws, msg) {
         }
       }
       broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 发动了主动技能` });
+      break;
+    }
+    case 'publishInfo': {
+      if (!room || room.difficulty !== 'hard' || !room.traits) return;
+      const player = room.players.find(p => p.id === ws.playerId);
+      if (!player) return;
+      const category = String(msg.category || '');
+      if (!['identity','skill','score'].includes(category)) return;
+      const used = room.infoActions[player.id] || 0;
+      if (used >= 2) {
+        if (player.score < 15) {
+          send(ws, { type: 'error', message: '积分不足15，无法购买额外情报行动' });
+          return;
+        }
+        player.score -= 10;
+      }
+      room.infoActions[player.id] = used + 1;
+      if (!room.publicInfo[player.id]) room.publicInfo[player.id] = {};
+      const trait = room.traits[player.id];
+      if (category === 'identity' && trait) {
+        room.publicInfo[player.id].identity = { name: trait.name, desc: trait.desc };
+        broadcast(room, { type: 'publicInfo', playerId: player.id, name: player.name, category: 'identity', value: trait.name });
+      } else if (category === 'skill' && trait && trait.skill) {
+        room.publicInfo[player.id].skill = { name: trait.skill.name, desc: trait.skill.desc };
+        broadcast(room, { type: 'publicInfo', playerId: player.id, name: player.name, category: 'skill', value: trait.skill.name });
+      } else if (category === 'score') {
+        room.publicInfo[player.id].score = player.score;
+        broadcast(room, { type: 'publicInfo', playerId: player.id, name: player.name, category: 'score', value: player.score });
+      } else {
+        send(ws, { type: 'error', message: '当前没有可公布的信息' });
+        return;
+      }
       break;
     }
     case 'revealMyInfo': {
