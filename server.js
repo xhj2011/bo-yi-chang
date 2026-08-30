@@ -52,6 +52,19 @@ const STRATEGY_CARDS = [
   { id: 'minority_oracle', name: '先知', event: 'minority', rarity: 'epic', color: '#c084fc', value: 15, desc: '少数者：如果你在少数方，额外+15', effect: 'minority_bonus' }
 ];
 const EVENT_TWISTS = {
+  prisoner: [
+    { id: 'reprieve', name: '特赦令', desc: '合作者+5，背叛者-3。', apply(room, result) {
+      room.players.forEach(p => { if (room.choices[p.id] === '合作') result.deltas[p.id] = (result.deltas[p.id] || 0) + 5; else if (room.choices[p.id] === '背叛') result.deltas[p.id] = (result.deltas[p.id] || 0) - 3; });
+      result.detail += '\n【特赦令】合作者+5，背叛者-3';
+      return result;
+    } },
+    { id: 'snitch', name: '告密者', desc: '随机一名玩家被公开真实选择。', apply(room, result) {
+      const players = room.players;
+      const target = players[Math.floor(Math.random() * players.length)];
+      result.detail += '\n【告密者】' + target.name + ' 的选择被公开：' + (room.choices[target.id] || '未知');
+      return result;
+    } }
+  ],
   public: [
     { id: 'mayor_reward', name: '村长的奖励', desc: '随机一名投入者额外+15，没人投入则没有奖励。', apply(room, result) {
       const investors = room.players.filter(p => room.choices[p.id] === '投入');
@@ -1496,24 +1509,50 @@ function applyIdentityToDeltas(room, deltas) {
 function applyHardModifier(room, result) {
   if (room.difficulty !== 'hard') return result;
   const mods = [
-    { name: '市场恐慌', delta: -5 },
-    { name: '意外之财', delta: 5 },
-    { name: '奖励波动', delta: 3 },
-    { name: '成本上升', delta: -3 }
+    { name: '市场恐慌', delta: -5, type: 'all' },
+    { name: '意外之财', delta: 5, type: 'all' },
+    { name: '奖励波动', delta: 3, type: 'all' },
+    { name: '成本上升', delta: -3, type: 'all' },
+    { name: '全城丰收', delta: 4, type: 'all' },
+    { name: '寒冬将至', delta: -4, type: 'all' },
+    { name: '黑市交易', type: 'random_plus', value: 10 },
+    { name: '幸运儿', type: 'random_plus', value: 8 },
+    { name: '意外补贴', type: 'lowest_plus', value: 12 },
+    { name: '劫富济贫', type: 'redistribute', rich: -8, poor: 8 }
   ];
   const mod = mods[Math.floor(Math.random() * mods.length)];
-  room.players.forEach(p => {
+  const eligible = room.players.filter(p => {
     const trait = room.traits && room.traits[p.id];
-    const isSteady = trait && trait.id === 'steady';
     const isSafe = trait && trait.id === 'safe_harbor';
     const isLocked = room.activeSkillEffects && room.activeSkillEffects[p.id] === 'steady_gain';
-    if (isSteady || isLocked || isSafe) return;
-    result.deltas[p.id] = (result.deltas[p.id] || 0) + mod.delta;
+    return !isSafe && !isLocked;
   });
-  result.detail = (result.detail || '') + `\n【困难随机事件】${mod.name}：全员${mod.delta > 0 ? '+' : ''}${mod.delta}分`;
+  if (mod.type === 'all') {
+    eligible.forEach(p => {
+      result.deltas[p.id] = (result.deltas[p.id] || 0) + mod.delta;
+    });
+    result.detail += `\n【困难随机事件】${mod.name}：全员${mod.delta > 0 ? '+' : ''}${mod.delta}分`;
+  } else if (mod.type === 'random_plus') {
+    if (eligible.length) {
+      const target = eligible[Math.floor(Math.random() * eligible.length)];
+      result.deltas[target.id] = (result.deltas[target.id] || 0) + mod.value;
+      result.detail += `\n【困难随机事件】${mod.name}：${target.name} +${mod.value}分`;
+    }
+  } else if (mod.type === 'lowest_plus') {
+    if (eligible.length) {
+      const target = eligible.reduce((a, b) => a.score <= b.score ? a : b);
+      result.deltas[target.id] = (result.deltas[target.id] || 0) + mod.value;
+      result.detail += `\n【困难随机事件】${mod.name}：${target.name} +${mod.value}分`;
+    }
+  } else if (mod.type === 'redistribute' && eligible.length >= 2) {
+    const rich = eligible.reduce((a, b) => a.score >= b.score ? a : b);
+    const poor = eligible.reduce((a, b) => a.score <= b.score ? a : b);
+    result.deltas[rich.id] = (result.deltas[rich.id] || 0) + mod.rich;
+    result.deltas[poor.id] = (result.deltas[poor.id] || 0) + mod.poor;
+    result.detail += `\n【困难随机事件】${mod.name}：${rich.name}-8，${poor.name}+8`;
+  }
   return result;
 }
-
 function resolveNormal(room) {
   const event = room.currentEvent;
   let result = event.resolve(room.players, room.choices);
