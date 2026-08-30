@@ -194,7 +194,14 @@ const EVENT_TWISTS = {
       result.detail += `\n【原料涨价】成本15，单价${price}`;
       return result;
     } }
-  ]
+  ],
+  allpay: [
+    { id: 'price_boost', name: '拍品增值', desc: '最高出价者额外+15。' }
+  ],
+  ultimatum: [
+    { id: 'reject_penalty', name: '拒绝代价', desc: '拒绝时双方各扣25分。' },
+    { id: 'generous_pool', name: '慷慨之海', desc: '接受时双方额外+5。' }
+  ],
 };
 const EVENTS = [
   {
@@ -716,11 +723,13 @@ function resolveUltimatumAll(room) {
       if (pair.response) {
         deltas[proposer.id] += 100 - pair.share;
         deltas[responder.id] += pair.share;
+        if (room.twist && room.twist.id === 'generous_pool') { deltas[proposer.id] += 5; deltas[responder.id] += 5; }
         lines.push(`${proposer.name} 给 ${responder.name} ${pair.share}，接受：前者+${100 - pair.share}，后者+${pair.share}`);
       } else {
-        deltas[proposer.id] += -15;
-          deltas[responder.id] += -15;
-          lines.push(`${proposer.name} 给 ${responder.name} ${pair.share}，拒绝：双方各-15`);
+        const penalty = room.twist && room.twist.id === 'reject_penalty' ? 25 : 15;
+        deltas[proposer.id] += -penalty;
+        deltas[responder.id] += -penalty;
+        lines.push(`${proposer.name} 给 ${responder.name} ${pair.share}，拒绝：双方各-${penalty}`);
       }
     }
   });
