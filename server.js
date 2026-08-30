@@ -6,9 +6,7 @@ const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const TRAITS = [
-  { id: 'disguiser', name: '伪装者', desc: '技能不会暴露真实身份；结算+4', skill: { id: 'disguise', name: '易容术', desc: '本轮额外+8，并且别人看到的是假身份' } },
   { id: 'spy', name: '间谍', desc: '复杂事件中额外+6', skill: { id: 'peek', name: '窥探', desc: '随机查看一名其他玩家的身份，并获得+4' } },
-  { id: 'trickster', name: '欺诈者', desc: '选择背叛类行动时+5；选择合作类行动时-2', skill: { id: 'lie', name: '谎报', desc: '本轮向所有人公布假身份，并额外+6' } },
   { id: 'aggressor', name: '激进者', desc: '你赚的时候多赚12分；你赔的时候再多赔12分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
   { id: 'conservative', name: '保守者', desc: '你赚的时候少赚4分；你赔的时候少赔4分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半；有收益时+2' } },
   { id: 'lucky', name: '幸运儿', desc: '结算随机浮动-6~+10分', skill: { id: 'destiny', name: '天命', desc: '本轮高波动：50% +15，50% -5' } },
@@ -1609,11 +1607,6 @@ function handleMessage(ws, msg) {
           room.activeSkillTargets[player.id] = others[Math.floor(Math.random() * others.length)].id;
         }
       }
-      let shownSkillName = trait.skill.name;
-      if (trait.id === 'disguiser' || trait.id === 'trickster') {
-        const fakeSkills = TRAITS.filter(t => t.id !== trait.id).map(t => t.skill.name);
-        if (fakeSkills.length) shownSkillName = fakeSkills[Math.floor(Math.random() * fakeSkills.length)];
-      }
       if (trait.id === 'spy') {
         const others = room.players.filter(x => x.id !== player.id);
         if (others.length) {
@@ -1624,14 +1617,7 @@ function handleMessage(ws, msg) {
           }
         }
       }
-      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 使用了身份技能：${shownSkillName}` });
-      if (trait.id === 'trickster') {
-        const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
-        if (fakeTraits.length) {
-          const fake = fakeTraits[Math.floor(Math.random() * fakeTraits.length)];
-          broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 宣称自己的身份是：${fake.name}` });
-        }
-      }
+      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 发动了主动技能` });
       break;
     }
     case 'confirmRead': {
