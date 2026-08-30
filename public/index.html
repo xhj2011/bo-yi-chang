@@ -775,6 +775,11 @@ function handle(msg) {
       renderGame();
       break;
     }
+    case 'spyInfo': {
+      window._spyInfo = msg;
+      renderGame();
+      break;
+    }
     case 'trait': {
       myTrait = msg.trait || null;
       renderGame();
@@ -941,6 +946,7 @@ function renderGame() {
   let html = '';
   if (myTrait) html += `<div class="phase" style="color:#a5b4fc;">🂠 你的隐藏身份：${escapeHtml(myTrait.name)}（${escapeHtml(myTrait.desc)}）</div>`;
   if (myTrait && myTrait.skill && phase !== 'trait_select') {
+  if (window._spyInfo) html += `<p class="link">🕵️ 你窥探到 ${escapeHtml(window._spyInfo.name)} 的身份是：${escapeHtml(window._spyInfo.trait.name)}</p>`;
     if (mySkillUsed) {
       html += `<p class="link">身份技能已使用：${escapeHtml(myTrait.skill.name)}</p>`;
     } else {

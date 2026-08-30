@@ -6,8 +6,9 @@ const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const TRAITS = [
-  { id: 'cooperator', name: '守约者', desc: '选择合作类行动时+8；选择背叛类行动时-4', skill: { id: 'oath', name: '信义之誓', desc: '本轮合作类行动收益再+15' } },
-  { id: 'betrayer', name: '枭雄', desc: '选择背叛类行动时+8；选择合作类行动时-4', skill: { id: 'blade', name: '背叛之刃', desc: '本轮背叛类行动收益再+15' } },
+  { id: 'disguiser', name: '伪装者', desc: '技能不会暴露真实身份；结算+4', skill: { id: 'disguise', name: '易容术', desc: '本轮额外+8，并且别人看到的是假身份' } },
+  { id: 'spy', name: '间谍', desc: '复杂事件中额外+6', skill: { id: 'peek', name: '窥探', desc: '随机查看一名其他玩家的身份，并获得+4' } },
+  { id: 'trickster', name: '欺诈者', desc: '选择背叛类行动时+5；选择合作类行动时-2', skill: { id: 'lie', name: '谎报', desc: '本轮向所有人公布假身份，并额外+6' } },
   { id: 'aggressor', name: '激进者', desc: '你赚的时候多赚12分；你赔的时候再多赔12分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
   { id: 'conservative', name: '保守者', desc: '你赚的时候少赚4分；你赔的时候少赔4分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半；有收益时+2' } },
   { id: 'lucky', name: '幸运儿', desc: '结算随机浮动-6~+10分', skill: { id: 'destiny', name: '天命', desc: '本轮高波动：50% +15，50% -5' } },
@@ -1354,10 +1355,12 @@ function applyIdentityToDeltas(room, deltas) {
     if (!trait) return;
     const isCoop = coopSet.includes(room.choices[p.id]);
     let d = deltas[p.id] || 0;
-    if (trait.id === 'cooperator') {
-      if (coopSet.length) deltas[p.id] = isCoop ? d + (risk ? 10 : 8) : d - 4;
-    } else if (trait.id === 'betrayer') {
-      if (coopSet.length) deltas[p.id] = !isCoop ? d + (risk ? 10 : 8) : d - 4;
+    if (trait.id === 'disguiser') {
+      deltas[p.id] = d + 4;
+    } else if (trait.id === 'spy') {
+      if (risk) deltas[p.id] = d + 6;
+    } else if (trait.id === 'trickster') {
+      if (coopSet.length) deltas[p.id] = isCoop ? d - 2 : d + (risk ? 7 : 5);
     } else if (trait.id === 'aggressor') {
       deltas[p.id] = d > 0 ? d + (risk ? 15 : 12) : d - (risk ? 15 : 12);
     } else if (trait.id === 'conservative') {
@@ -1373,10 +1376,10 @@ function applyIdentityToDeltas(room, deltas) {
     room.players.forEach(p => {
       const skillId = room.activeSkillEffects[p.id];
       if (!skillId) return;
-      const isCoop = coopSet.includes(room.choices[p.id]);
       let d = deltas[p.id] || 0;
-      if (skillId === 'oath' && isCoop && coopSet.length) d += (risk ? 18 : 15);
-      else if (skillId === 'blade' && !isCoop && coopSet.length) d += (risk ? 18 : 15);
+      if (skillId === 'disguise') d += 8;
+      else if (skillId === 'peek') d += 4;
+      else if (skillId === 'lie') d += 6;
       else if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
       else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + 2;
       else if (skillId === 'destiny') d += (Math.random() < 0.5 ? 15 : -5);
@@ -1589,7 +1592,29 @@ function handleMessage(ws, msg) {
       if (room.usedSkills[player.id]) return;
       room.usedSkills[player.id] = true;
       room.activeSkillEffects[player.id] = trait.skill.id;
-      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 使用了身份技能：${trait.skill.name}` });
+      let shownSkillName = trait.skill.name;
+      if (trait.id === 'disguiser' || trait.id === 'trickster') {
+        const fakeSkills = TRAITS.filter(t => t.id !== trait.id).map(t => t.skill.name);
+        if (fakeSkills.length) shownSkillName = fakeSkills[Math.floor(Math.random() * fakeSkills.length)];
+      }
+      if (trait.id === 'spy') {
+        const others = room.players.filter(x => x.id !== player.id);
+        if (others.length) {
+          const target = others[Math.floor(Math.random() * others.length)];
+          const targetTrait = room.traits[target.id];
+          if (targetTrait) {
+            sendTo(room, player.id, { type: 'spyInfo', name: target.name, trait: targetTrait });
+          }
+        }
+      }
+      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 使用了身份技能：${shownSkillName}` });
+      if (trait.id === 'trickster') {
+        const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
+        if (fakeTraits.length) {
+          const fake = fakeTraits[Math.floor(Math.random() * fakeTraits.length)];
+          broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 宣称自己的身份是：${fake.name}` });
+        }
+      }
       break;
     }
     case 'confirmRead': {
