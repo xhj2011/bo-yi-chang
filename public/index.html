@@ -795,11 +795,20 @@ function handle(msg) {
       if (phase === 'reveal' && window._lastRevealMsg) renderReveal(window._lastRevealMsg);
       break;
     }
+    case 'publicInfoDelete': {
+      if (window._infoBoard && window._infoBoard[msg.playerId]) {
+        window._infoBoard[msg.playerId][msg.category] = null;
+      }
+      const catName = msg.category === 'identity' ? '身份' : msg.category === 'skill' ? '技能' : '分数';
+      appendChat('系统', `【情报板】${msg.name} 的${catName}被清除`);
+      renderInfoBoard();
+      break;
+    }
     case 'publicInfo': {
       window._infoBoard = window._infoBoard || {};
       const pid = msg.playerId;
       if (!window._infoBoard[pid]) window._infoBoard[pid] = { name: msg.name, identity: null, skill: null, score: null };
-      window._infoBoard[pid][msg.category] = { value: msg.value, modified: false };
+      window._infoBoard[pid][msg.category] = { value: msg.value, modified: !!msg.modified };
       const catName = msg.category === 'identity' ? '身份' : msg.category === 'skill' ? '技能' : '分数';
       appendChat('系统', `【情报板】${msg.name} 公布${catName}：${msg.value}`);
       renderInfoBoard();

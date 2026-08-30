@@ -11,7 +11,9 @@ const TRAITS = [
   { id: 'conservative', name: '保守者', desc: '你赚的时候少赚4分；你赔的时候少赔4分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半；有收益时+2' } },
   { id: 'lucky', name: '幸运儿', desc: '结算随机浮动-6~+10分', skill: { id: 'destiny', name: '天命', desc: '本轮高波动：50% +15，50% -5' } },
   { id: 'strategist', name: '谋略家', desc: '在拍卖/决斗/最后通牒/海盗等复杂事件中额外+7', skill: { id: 'puppet', name: '幕后推手', desc: '选择一名玩家，本轮若TA盈利，你获得其盈利的30%；若TA亏损，你无损失' } },
-  { id: 'forger', name: '造假者', desc: '在复杂事件中额外+5；可以篡改他人公开信息', skill: { id: 'forge', name: '信息篡改', desc: '随机篡改一名玩家的公开信息' } }
+  { id: 'info_broker', name: '情报商', desc: '开局额外+1情报行动', skill: { id: 'forge', name: '编造假情报', desc: '随机生成一条假公开信息' } },
+  { id: 'censor', name: '审查者', desc: '可以看到被修改过的信息', skill: { id: 'block', name: '阻止公开', desc: '随机一名玩家本轮不能发布信息' } },
+  { id: 'cleaner', name: '清除者', desc: '可以看到所有公开信息', skill: { id: 'deleteInfo', name: '清除情报', desc: '随机清除一名玩家的一条公开信息' } }
 ];
 const COOP_ACTIONS = {
   prisoner: ['合作'],
@@ -530,6 +532,7 @@ function startRound(room) {
   room.phase = 'reading';
   room.activeSkillEffects = {};
   room.activeSkillTargets = {};
+  room.blockedPublish = {};
   room.choices = {};
   room.currentEvent = room.deck[room.roundIndex];
   room.ultimatum = null;
@@ -1649,6 +1652,7 @@ function handleMessage(ws, msg) {
   room.infoActions = {};
           room.activeSkillEffects = {};
   room.activeSkillTargets = {};
+  room.blockedPublish = {};
           room.phase = 'trait_select';
           broadcast(room, { type: 'traitSelect', traits: TRAITS, players: publicPlayers(room) });
           room.players.forEach(p => {
@@ -1698,23 +1702,50 @@ function handleMessage(ws, msg) {
           room.activeSkillTargets[player.id] = others[Math.floor(Math.random() * others.length)].id;
         }
       }
-      if (trait.id === 'forger') {
+      if (trait.id === 'info_broker') {
         const others = room.players.filter(x => x.id !== player.id);
         if (others.length) {
           const target = others[Math.floor(Math.random() * others.length)];
-          const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
-          const fakeTrait = fakeTraits[Math.floor(Math.random() * fakeTraits.length)] || TRAITS[0];
-          const fakeCard = room.selectedCards[target.id] ? { name: room.selectedCards[target.id].name } : { name: '无' };
-          const fakeInfo = {
-            id: target.id,
-            name: target.name,
-            trait: { name: fakeTrait.name },
-            skill: { name: fakeTrait.skill.name },
-            card: fakeCard,
-            score: target.score
-          };
-          room.revealedInfo[target.id] = fakeInfo;
-          broadcast(room, { type: 'publicInfo', info: fakeInfo });
+          const cats = ['identity', 'skill', 'score'];
+          const cat = cats[Math.floor(Math.random() * cats.length)];
+          if (!room.publicInfo[target.id]) room.publicInfo[target.id] = {};
+          let value = '';
+          if (cat === 'identity') {
+            const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
+            const fakeTrait = fakeTraits[Math.floor(Math.random() * fakeTraits.length)] || TRAITS[0];
+            value = fakeTrait.name;
+            room.publicInfo[target.id].identity = { name: value, desc: fakeTrait.desc, forged: true, modified: true };
+          } else if (cat === 'skill') {
+            const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
+            const fakeTrait = fakeTraits[Math.floor(Math.random() * fakeTraits.length)] || TRAITS[0];
+            value = fakeTrait.skill.name;
+            room.publicInfo[target.id].skill = { name: value, desc: fakeTrait.skill.desc, forged: true, modified: true };
+          } else {
+            value = Math.floor(Math.random() * 200);
+            room.publicInfo[target.id].score = value;
+          }
+          broadcast(room, { type: 'publicInfo', playerId: target.id, name: target.name, category: cat, value, modified: true });
+        }
+      }
+      if (trait.id === 'censor') {
+        const others = room.players.filter(x => x.id !== player.id);
+        if (others.length) {
+          const target = others[Math.floor(Math.random() * others.length)];
+          room.blockedPublish = room.blockedPublish || {};
+          room.blockedPublish[target.id] = true;
+          broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 本轮被禁止发布公开信息` });
+        }
+      }
+      if (trait.id === 'cleaner') {
+        const others = room.players.filter(x => x.id !== player.id);
+        if (others.length) {
+          const target = others[Math.floor(Math.random() * others.length)];
+          const cats = ['identity', 'skill', 'score'];
+          const cat = cats[Math.floor(Math.random() * cats.length)];
+          if (room.publicInfo[target.id]) {
+            room.publicInfo[target.id][cat] = null;
+            broadcast(room, { type: 'publicInfoDelete', playerId: target.id, name: target.name, category: cat });
+          }
         }
       }
       if (trait.id === 'spy') {
@@ -1734,6 +1765,10 @@ function handleMessage(ws, msg) {
       if (!room || room.difficulty !== 'hard' || !room.traits) return;
       const player = room.players.find(p => p.id === ws.playerId);
       if (!player) return;
+      if (room.blockedPublish && room.blockedPublish[player.id]) {
+        send(ws, { type: 'error', message: '你本轮被禁止发布公开信息' });
+        return;
+      }
       const category = String(msg.category || '');
       if (!['identity','skill','score'].includes(category)) return;
       const used = room.infoActions[player.id] || 0;
