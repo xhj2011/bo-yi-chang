@@ -6,12 +6,19 @@ const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const TRAITS = [
-  { id: 'aggressive', name: '激进者', desc: '你赚的时候多赚10分；你赔的时候再多赔10分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
-  { id: 'conservative', name: '保守者', desc: '你赚的时候少赚5分；你赔的时候少赔5分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
-  { id: 'lucky', name: '幸运儿', desc: '每次结算在原本结果上随机浮动-5到+8分', skill: { id: 'destiny', name: '天命', desc: '本轮额外获得0~12分' } },
-  { id: 'steady', name: '稳健者', desc: '免疫全局随机波动；收益+2，单轮损失最多-15', skill: { id: 'steady_gain', name: '风险闸', desc: '本轮损失最多-5；若为正则额外+5' } }
+  { id: 'cooperator', name: '守约者', desc: '选择合作类行动时+8；选择背叛类行动时-4', skill: { id: 'oath', name: '信义之誓', desc: '本轮合作类行动收益再+15' } },
+  { id: 'betrayer', name: '枭雄', desc: '选择背叛类行动时+8；选择合作类行动时-4', skill: { id: 'blade', name: '背叛之刃', desc: '本轮背叛类行动收益再+15' } }
 ];
 
+const COOP_ACTIONS = {
+  prisoner: ['合作'],
+  public: ['投入'],
+  stag: ['猎鹿'],
+  volunteer: ['站出来'],
+  trust: ['继续投资'],
+  minority: [],
+  cournot: ['低产量']
+};
 
 const EVENT_TWISTS = {
   public: [
@@ -1336,39 +1343,38 @@ function startChoice(room) {
 function applyIdentityToDeltas(room, deltas) {
   if (room.difficulty !== 'hard' || !room.traits) return deltas;
   const type = room.currentEvent ? room.currentEvent.type : '';
+  const eventId = room.currentEvent ? room.currentEvent.id : '';
   const risk = ['auction', 'duel', 'ultimatum', 'pirate'].includes(type);
+  const coopSet = COOP_ACTIONS[eventId] || [];
   room.players.forEach(p => {
     const trait = room.traits[p.id];
     if (!trait) return;
+    const isCoop = coopSet.includes(room.choices[p.id]);
     let d = deltas[p.id] || 0;
-    if (trait.id === 'aggressive') {
-      const a = risk ? 15 : 10;
-      deltas[p.id] = d > 0 ? d + a : d - a;
-    } else if (trait.id === 'conservative') {
-      const a = risk ? 7 : 5;
-      deltas[p.id] = d > 0 ? d - a : d + a;
-    } else if (trait.id === 'lucky') {
-      deltas[p.id] = d + (Math.floor(Math.random() * (risk ? 21 : 14)) - (risk ? 8 : 5));
-    } else if (trait.id === 'steady') {
-      const a = risk ? 3 : 2;
-      if (d > 0) deltas[p.id] = d + a;
-      else deltas[p.id] = Math.max(d + a, -15);
+    if (trait.id === 'cooperator') {
+      if (coopSet.length) {
+        deltas[p.id] = isCoop ? d + (risk ? 10 : 8) : d - 4;
+      }
+    } else if (trait.id === 'betrayer') {
+      if (coopSet.length) {
+        deltas[p.id] = !isCoop ? d + (risk ? 10 : 8) : d - 4;
+      }
     }
   });
   if (room.activeSkillEffects) {
     room.players.forEach(p => {
       const skillId = room.activeSkillEffects[p.id];
       if (!skillId) return;
+      const isCoop = coopSet.includes(room.choices[p.id]);
       let d = deltas[p.id] || 0;
-      if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
-      else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + (risk ? 5 : 3);
-      else if (skillId === 'destiny') d += (Math.random() < 0.5 ? 15 : -5);
-      else if (skillId === 'steady_gain') d = d < 0 ? Math.max(d, -5) : d + 5;
+      if (skillId === 'oath' && isCoop && coopSet.length) d += (risk ? 18 : 15);
+      else if (skillId === 'blade' && !isCoop && coopSet.length) d += (risk ? 18 : 15);
       deltas[p.id] = d;
     });
   }
   return deltas;
 }
+
 function applyHardModifier(room, result) {
   if (room.difficulty !== 'hard') return result;
   const mods = [
