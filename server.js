@@ -202,6 +202,14 @@ const EVENT_TWISTS = {
     { id: 'reject_penalty', name: '拒绝代价', desc: '拒绝时双方各扣25分。' },
     { id: 'generous_pool', name: '慷慨之海', desc: '接受时双方额外+5。' }
   ],
+  duel: [
+    { id: 'steady_aim', name: '风沙减弱', desc: '每次开枪命中率+10%。' },
+    { id: 'bloodlust', name: '狂热对决', desc: '决斗伤害额外放大10%。' }
+  ],
+  pirate: [
+    { id: 'treasure_boost', name: '宝藏增值', desc: '通过的方案每人额外+5。' },
+    { id: 'mutiny', name: '哗变风险', desc: '提案被否决时，提案者额外扣10分。' }
+  ],
 };
 const EVENTS = [
   {
@@ -956,7 +964,7 @@ function handleDuelAction(room, playerId, action) {
   if (!current || !other) return;
 
   if (action === '开枪') {
-    const chance = hitChance(pair.turn);
+    const chance = Math.min(0.95, hitChance(pair.turn) + (room.twist && room.twist.id === 'steady_aim' ? 0.1 : 0));
     const hit = Math.random() < chance;
     const deltas = {};
     room.players.forEach(p => deltas[p.id] = 0);
@@ -997,6 +1005,10 @@ function handleDuelAction(room, playerId, action) {
 }
 
 function finishDuel(room, deltas, detail) {
+  if (room.twist && room.twist.id === 'bloodlust') {
+    room.players.forEach(p => { deltas[p.id] = Math.round((deltas[p.id] || 0) * 1.1); });
+    detail += '\\n【狂热对决】伤害放大10%';
+  }
   const publicDeltas = Object.assign({}, deltas);
   applyIdentityToDeltas(room, deltas);
   const d = room.duel;
@@ -1245,8 +1257,10 @@ function resolvePirate(room) {
   if (majority) {
     const proposal = pi.proposal || {};
     alive.forEach(p => {
-      deltas[p.id] = proposal[p.id] || 0;
-      p.score += deltas[p.id] || 0;
+      let v = proposal[p.id] || 0;
+      if (room.twist && room.twist.id === 'treasure_boost') v += 5;
+      deltas[p.id] = v;
+      p.score += v;
     });
     const summary = alive.map(p => `${p.name} ${deltas[p.id]}`).join('，');
       const roles = {};
@@ -1264,8 +1278,9 @@ function resolvePirate(room) {
   }
 
   if (proposer) {
-    proposer.score -= 50;
-    deltas[proposer.id] = -50;
+    const penalty = room.twist && room.twist.id === 'mutiny' ? 60 : 50;
+    proposer.score -= penalty;
+    deltas[proposer.id] = -penalty;
   }
   pi.aliveIds = pi.aliveIds.filter(id => id !== pi.proposerId);
   pi.turnIndex++;
@@ -1646,7 +1661,7 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': mime });
     res.end(data);
   });
-});
+  });
 
 const wss = new WebSocket.Server({ server: httpServer });
 
@@ -1656,7 +1671,7 @@ wss.on('connection', ws => {
     try { msg = JSON.parse(raw); } catch { return; }
     handleMessage(ws, msg);
   });
-});
+  });
 
 function handleMessage(ws, msg) {
   const room = ws.roomCode ? rooms.get(ws.roomCode) : null;
