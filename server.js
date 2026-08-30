@@ -386,7 +386,8 @@ function checkReadingComplete(room) {
   if (room.phase !== 'reading') return;
   if (room.players.every(p => room.readConfirmed[p.id])) {
     room.phase = 'discussion';
-    broadcast(room, { type: 'discussionOpen', players: publicPlayers(room) });
+    room.discussionStart = Date.now();
+    broadcast(room, { type: 'discussionOpen', players: publicPlayers(room), minDiscussMs: 30000 });
   }
 }
 
@@ -1300,7 +1301,12 @@ function handleMessage(ws, msg) {
     case 'startChoice': {
       if (room && room.hostId === ws.playerId) {
         if (room.phase === 'discussion') {
-          startChoice(room);
+          const elapsed = Date.now() - (room.discussionStart || 0);
+          if (elapsed < 30000) {
+            send(ws, { type: 'error', message: `请先在讨论区讨论至少 ${Math.ceil((30000 - elapsed) / 1000)} 秒` });
+          } else {
+            startChoice(room);
+          }
         } else if (room.phase === 'choosing') {
           broadcast(room, { type: 'choiceOpen', event: publicEvent(room.currentEvent), players: publicPlayers(room) });
         } else if (room.phase === 'repeat_choosing' && room.repeat) {
