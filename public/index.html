@@ -665,6 +665,8 @@ let ultimatumOpponent = null;
 let scoreAnimated = false;
 let ultimatumRole = 'watch';
 let ultimatumAnswered = null;
+let readConfirmed = false;
+let readingInfo = { read: 0, total: 0 };
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -733,12 +735,14 @@ function handle(msg) {
     case 'roundStart': {
       players = msg.players || [];
       currentEvent = msg.event;
-      phase = 'discussion';
+      phase = 'reading';
       myChoice = null;
       ultimatumRole = 'watch';
       myOpponent = null;
       ultimatumOpponent = null;
       ultimatumAnswered = null;
+      readConfirmed = false;
+      readingInfo = { read: 0, total: (msg.players || []).length };
         scoreAnimated = false;
       document.getElementById('lobby').classList.add('hidden');
       document.getElementById('game').classList.remove('hidden');
@@ -749,6 +753,16 @@ function handle(msg) {
       document.getElementById('eventRule').textContent = currentEvent.desc;
       renderGame();
       renderScores();
+      break;
+    }
+    case 'discussionOpen': {
+      phase = 'discussion';
+      renderGame();
+      break;
+    }
+    case 'readingProgress': {
+      readingInfo = { read: msg.read, total: msg.total };
+      renderGame();
       break;
     }
     case 'choiceOpen': {
@@ -891,9 +905,18 @@ function renderLobby() {
 function renderGame() {
   const body = document.getElementById('gameBody');
   let html = '';
-  if (phase === 'discussion') {
+  if (phase === 'reading') {
+    html += `<div class="phase">阅读阶段 · 已确认 ${readingInfo.read}/${readingInfo.total}</div>
+      <p>请先仔细阅读上方规则，确认理解后再进入讨论。</p>`;
+    if (readConfirmed) {
+      html += `<p class="link">你已确认阅读，等待其他玩家…</p>`;
+    } else {
+      html += `<button onclick="confirmRead()">我已读完</button>`;
+    }
+  } else if (phase === 'discussion') {
     html += `<div class="phase">自由讨论阶段</div>
-      <p>可以在下方讨论区聊天、承诺、威胁、撒谎。</p>`;
+      <p>现在可以尽情讨论：承诺、威胁、撒谎、商量策略。</p>
+      <p class="link">建议大家多讨论一会儿，再开始选择。</p>`;
     if (host) {
       html += `<button onclick="send({type:'startChoice'})">开始本轮选择</button>`;
     } else {
@@ -1071,6 +1094,12 @@ window.centipedeAction = function (action) {
 
 }
 
+function confirmRead() {
+  readConfirmed = true;
+  send({ type: 'confirmRead' });
+  renderGame();
+}
+
 function choose(action) {
   if (myChoice) return;
   myChoice = action;
@@ -1096,7 +1125,7 @@ function hostNext() {
 }
 
 function phaseLabelText() {
-  return phase === 'discussion' ? '讨论阶段' :
+  return phase === 'discussion' ? '讨论阶段' : phase === 'reading' ? '阅读阶段' :
          phase === 'choosing' ? '选择阶段' : phase === 'repeat_choosing' ? '重复囚徒困境' :
          phase === 'ultimatum_propose' ? '提议阶段' :
          phase === 'ultimatum_respond' ? '回应阶段' :

@@ -358,7 +358,8 @@ function addBot(room) {
 
 
 function startRound(room) {
-  room.phase = 'discussion';
+  room.readConfirmed = {};
+  room.phase = 'reading';
   room.choices = {};
   room.currentEvent = room.deck[room.roundIndex];
   room.ultimatum = null;
@@ -374,6 +375,19 @@ function startRound(room) {
     event: publicEvent(room.currentEvent),
     players: publicPlayers(room)
   });
+  // Bots automatically finish reading; humans click “我已读完”.
+  room.players.forEach(p => {
+    if (p.isBot) room.readConfirmed[p.id] = true;
+  });
+  checkReadingComplete(room);
+}
+
+function checkReadingComplete(room) {
+  if (room.phase !== 'reading') return;
+  if (room.players.every(p => room.readConfirmed[p.id])) {
+    room.phase = 'discussion';
+    broadcast(room, { type: 'discussionOpen', players: publicPlayers(room) });
+  }
 }
 
 function assignBotChoices(room) {
@@ -1274,6 +1288,15 @@ function handleMessage(ws, msg) {
         break;
       }
 
+    case 'confirmRead': {
+      if (!room || room.phase !== 'reading') return;
+      const player = room.players.find(p => p.id === ws.playerId);
+      if (!player) return;
+      room.readConfirmed[player.id] = true;
+      broadcast(room, { type: 'readingProgress', read: Object.keys(room.readConfirmed).length, total: room.players.length });
+      checkReadingComplete(room);
+      break;
+    }
     case 'startChoice': {
       if (room && room.hostId === ws.playerId) {
         if (room.phase === 'discussion') {
