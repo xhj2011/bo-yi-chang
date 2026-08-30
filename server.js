@@ -6,13 +6,145 @@ const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const TRAITS = [
-  { id: 'aggressive', name: '激进者', desc: '收益额外+5，损失额外-5' },
-  { id: 'conservative', name: '保守者', desc: '收益-3，损失+3' },
-  { id: 'lucky', name: '幸运儿', desc: '每次结算随机浮动-2~+4' },
-  { id: 'steady', name: '稳健者', desc: '收益+2，损失-2' }
+  { id: 'aggressive', name: '激进者', desc: '收益额外+10，损失额外-10' },
+  { id: 'conservative', name: '保守者', desc: '收益-5，损失+5' },
+  { id: 'lucky', name: '幸运儿', desc: '每次结算随机浮动-5~+8' },
+  { id: 'steady', name: '稳健者', desc: '收益+4，损失-4' }
 ];
 
 
+const EVENT_TWISTS = {
+  public: [
+    { id: 'mayor_reward', name: '村长的奖励', desc: '随机一名投入者额外+15，没人投入则没有奖励。', apply(room, result) {
+      const investors = room.players.filter(p => room.choices[p.id] === '投入');
+      if (investors.length) {
+        const lucky = investors[Math.floor(Math.random() * investors.length)];
+        result.deltas[lucky.id] = (result.deltas[lucky.id] || 0) + 15;
+        result.detail += `\n【村长的奖励】${lucky.name}额外+15`;
+      }
+      return result;
+    } },
+    { id: 'grain_rot', name: '粮食霉变', desc: '投入人数不足半数时，旁观者也要扣10分。', apply(room, result) {
+      const investCount = room.players.filter(p => room.choices[p.id] === '投入').length;
+      const half = Math.ceil(room.players.length / 2);
+      if (investCount < half) {
+        room.players.forEach(p => { if (room.choices[p.id] !== '投入') result.deltas[p.id] = -10; });
+        result.detail += '\n【粮食霉变】旁观者也被扣10分';
+      }
+      return result;
+    } }
+  ],
+  stag: [
+    { id: 'rabbit_boom', name: '兔子泛滥', desc: '猎兔者额外+10，猎鹿风险更高。', apply(room, result) {
+      room.players.forEach(p => { if (room.choices[p.id] === '猎兔') result.deltas[p.id] = (result.deltas[p.id] || 0) + 10; });
+      result.detail += '\n【兔子泛滥】猎兔者额外+10';
+      return result;
+    } },
+    { id: 'alert_deer', name: '鹿群警觉', desc: '猎鹿人数不足或未过半数时，猎鹿者-30。', apply(room, result) {
+      const hunters = room.players.filter(p => room.choices[p.id] === '猎鹿');
+      const half = Math.ceil(room.players.length / 2);
+      if (hunters.length < half || hunters.length < 2) {
+        hunters.forEach(p => result.deltas[p.id] = -30);
+        result.detail += '\n【鹿群警觉】猎鹿失败，猎鹿者-30';
+      }
+      return result;
+    } }
+  ],
+  volunteer: [
+    { id: 'storm', name: '暴风雨升级', desc: '无人站出来全员-70；有人站出来时，不站出来者只+10。', apply(room, result) {
+      const vols = room.players.filter(p => room.choices[p.id] === '站出来');
+      if (vols.length === 0) {
+        room.players.forEach(p => result.deltas[p.id] = -70);
+        result.detail += '\n【暴风雨升级】无人站出来，全员-70';
+      } else {
+        room.players.forEach(p => { if (room.choices[p.id] !== '站出来') result.deltas[p.id] = 10; });
+        result.detail += '\n【暴风雨升级】不站出来者只+10';
+      }
+      return result;
+    } },
+    { id: 'keeper', name: '灯塔看守', desc: '如果只有1人站出来，站出来者反而+10。', apply(room, result) {
+      const vols = room.players.filter(p => room.choices[p.id] === '站出来');
+      if (vols.length === 1) {
+        result.deltas[vols[0].id] = 10;
+        result.detail += '\n【灯塔看守】唯一站出来者+10';
+      }
+      return result;
+    } }
+  ],
+  trust: [
+    { id: 'rescue', name: '央行救市', desc: '继续投资人数≥半数时奖励池改为人数×35；危机时继续投资者-30。', apply(room, result) {
+      const withdraw = room.players.filter(p => room.choices[p.id] === '撤资').length;
+      const half = Math.ceil(room.players.length / 2);
+      const crisis = withdraw >= half;
+      const continueCount = room.players.length - withdraw;
+      if (!crisis) {
+        const rewardEach = Math.floor(room.players.length * 35 / Math.max(1, continueCount));
+        room.players.forEach(p => { if (room.choices[p.id] !== '撤资') result.deltas[p.id] = rewardEach; });
+        result.detail += '\n【央行救市】奖励池提高到人数×35';
+      } else {
+        room.players.forEach(p => { if (room.choices[p.id] !== '撤资') result.deltas[p.id] = -30; });
+        result.detail += '\n【央行救市】继续投资者只扣30';
+      }
+      return result;
+    } },
+    { id: 'panic', name: '挤兑恐慌', desc: '危机时撤资者-20；未危机时撤资者+25。', apply(room, result) {
+      const withdraw = room.players.filter(p => room.choices[p.id] === '撤资').length;
+      const half = Math.ceil(room.players.length / 2);
+      const crisis = withdraw >= half;
+      room.players.forEach(p => {
+        if (room.choices[p.id] === '撤资') result.deltas[p.id] = crisis ? -20 : 25;
+      });
+      result.detail += crisis ? '\n【挤兑恐慌】撤资者-20' : '\n【挤兑恐慌】撤资者+25';
+      return result;
+    } }
+  ],
+  minority: [
+    { id: 'tie_cost', name: '平局代价', desc: '双方人数相同则全员-10。', apply(room, result) {
+      const a = room.players.filter(p => room.choices[p.id] === 'A').length;
+      const b = room.players.length - a;
+      if (a === b) {
+        room.players.forEach(p => result.deltas[p.id] = -10);
+        result.detail += '\n【平局代价】平局，全员-10';
+      }
+      return result;
+    } },
+    { id: 'big_prize', name: '少数派大奖', desc: '少数方每人+50（原+40）。', apply(room, result) {
+      const a = room.players.filter(p => room.choices[p.id] === 'A').length;
+      const b = room.players.length - a;
+      const minorityIsA = a < b;
+      room.players.forEach(p => {
+        const isMinor = (room.choices[p.id] === 'A' && minorityIsA) || (room.choices[p.id] === 'B' && !minorityIsA && a > b);
+        if (isMinor) result.deltas[p.id] = 50;
+      });
+      result.detail += '\n【少数派大奖】少数方每人+50';
+      return result;
+    } }
+  ],
+  cournot: [
+    { id: 'boom', name: '市场需求暴涨', desc: '价格公式提高：70 - 总产量×5。', apply(room, result) {
+      const outputMap = { '低产量': 1, '中产量': 2, '高产量': 3 };
+      const total = room.players.reduce((s, p) => s + (outputMap[room.choices[p.id]] || 1), 0);
+      const price = Math.max(0, 70 - total * 5);
+      room.players.forEach(p => {
+        const q = outputMap[room.choices[p.id]] || 1;
+        result.deltas[p.id] = q * (price - 10);
+      });
+      result.detail += `\n【市场需求暴涨】单价改为${price}`;
+      return result;
+    } },
+    { id: 'cost_up', name: '原料涨价', desc: '成本升到15，但基础价格提高到70，保持一定平衡。', apply(room, result) {
+      const outputMap = { '低产量': 1, '中产量': 2, '高产量': 3 };
+      const total = room.players.reduce((s, p) => s + (outputMap[room.choices[p.id]] || 1), 0);
+      const price = Math.max(0, 70 - total * 5);
+      room.players.forEach(p => {
+        const q = outputMap[room.choices[p.id]] || 1;
+        result.deltas[p.id] = q * (price - 15);
+      });
+      result.detail += `\n【原料涨价】成本15，单价${price}`;
+      return result;
+    } }
+  ]
+};
 const EVENTS = [
   {
     id: 'prisoner',
@@ -376,11 +508,19 @@ function startRound(room) {
     room.repeat = null;
     room.pirate = null;
     room.auction = null;
+  room.twist = null;
+  if (room.difficulty === 'hard') {
+    const twists = EVENT_TWISTS[room.currentEvent.id];
+    if (twists && twists.length) {
+      room.twist = twists[Math.floor(Math.random() * twists.length)];
+    }
+  }
   broadcast(room, {
     type: 'roundStart',
     round: room.roundIndex + 1,
     totalRounds: room.deck.length,
     event: publicEvent(room.currentEvent),
+    twist: room.twist ? { name: room.twist.name, desc: room.twist.desc } : null,
     players: publicPlayers(room)
   });
   if (room.difficulty === 'hard' && room.traits) {
@@ -1194,10 +1334,10 @@ function applyTrait(room, result) {
     const trait = room.traits[p.id];
     if (!trait) return;
     const d = result.deltas[p.id] || 0;
-    if (trait.id === 'aggressive') result.deltas[p.id] = d > 0 ? d + 5 : d - 5;
-    else if (trait.id === 'conservative') result.deltas[p.id] = d > 0 ? d - 3 : d + 3;
-    else if (trait.id === 'lucky') result.deltas[p.id] = d + (Math.floor(Math.random() * 7) - 2);
-    else if (trait.id === 'steady') result.deltas[p.id] = d > 0 ? d + 2 : d - 2;
+    if (trait.id === 'aggressive') result.deltas[p.id] = d > 0 ? d + 10 : d - 10;
+    else if (trait.id === 'conservative') result.deltas[p.id] = d > 0 ? d - 5 : d + 5;
+    else if (trait.id === 'lucky') result.deltas[p.id] = d + (Math.floor(Math.random() * 14) - 5);
+    else if (trait.id === 'steady') result.deltas[p.id] = d > 0 ? d + 4 : d - 4;
   });
   return result;
 }
@@ -1220,7 +1360,11 @@ function applyHardModifier(room, result) {
 
 function resolveNormal(room) {
   const event = room.currentEvent;
-  const result = applyTrait(room, applyHardModifier(room, event.resolve(room.players, room.choices)));
+  let result = event.resolve(room.players, room.choices);
+  if (room.twist && typeof room.twist.apply === 'function') {
+    result = room.twist.apply(room, result) || result;
+  }
+  result = applyTrait(room, applyHardModifier(room, result));
   room.players.forEach(p => {
     p.score += result.deltas[p.id] || 0;
   });

@@ -752,7 +752,9 @@ function handle(msg) {
         document.querySelector('.container').classList.add('in-game');
       document.getElementById('roundLabel').textContent = `第 ${msg.round} / ${msg.totalRounds} 轮`;
       document.getElementById('eventName').textContent = eventIcon(currentEvent.id) + ' ' + currentEvent.name;
-      document.getElementById('eventRule').textContent = currentEvent.desc;
+      let ruleText = currentEvent.desc;
+      if (msg.twist) ruleText += `\n\n⚡ 本局特殊事件：${msg.twist.name}\n${msg.twist.desc}`;
+      document.getElementById('eventRule').textContent = ruleText;
       renderGame();
       renderScores();
       break;
