@@ -6,11 +6,13 @@ const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const TRAITS = [
+  { id: 'berserker', name: '狂战士', desc: '收益+20%，损失+20%', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益/损失×1.5，风险事件×2' } },
+  { id: 'raider', name: '掠夺者', desc: '背叛/进攻收益+15%，合作收益-5%', skill: { id: 'aggr_bonus', name: '掠夺', desc: '本轮背叛/进攻收益再+20%' } },
+  { id: 'miser', name: '守财奴', desc: '收益-10%，损失-10%', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
+  { id: 'ironwall', name: '铁壁', desc: '单轮损失最多-15分', skill: { id: 'shield_wall', name: '绝对防御', desc: '本轮损失最多-5分' } },
+  { id: 'gambler', name: '赌徒', desc: '收益随机±20%', skill: { id: 'destiny', name: '豪赌', desc: '50% +30% / 50% -20%' } },
+  { id: 'chosen', name: '天选者', desc: '收益随机0~+15%', skill: { id: 'blessing', name: '天命', desc: '本轮额外+20%' } },
   { id: 'spy', name: '间谍', desc: '复杂事件中额外+6', skill: { id: 'peek', name: '窥探', desc: '随机查看一名其他玩家的身份，并获得+4' } },
-  { id: 'aggressor', name: '激进者', desc: '你赚的时候多赚12分；你赔的时候再多赔12分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
-  { id: 'conservative', name: '保守者', desc: '你赚的时候少赚4分；你赔的时候少赔4分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半；有收益时+2' } },
-  { id: 'lucky', name: '幸运儿', desc: '结算随机浮动-6~+10分', skill: { id: 'destiny', name: '天命', desc: '本轮高波动：50% +15，50% -5' } },
-  { id: 'strategist', name: '谋略家', desc: '在拍卖/决斗/最后通牒/海盗等复杂事件中额外+7', skill: { id: 'puppet', name: '幕后推手', desc: '选择一名玩家，本轮若TA盈利，你获得其盈利的30%；若TA亏损，你无损失' } },
   { id: 'info_broker', name: '情报商', desc: '开局额外+1情报行动', skill: { id: 'forge', name: '编造假情报', desc: '随机生成一条假公开信息' } },
   { id: 'censor', name: '审查者', desc: '可以看到被修改过的信息', skill: { id: 'block', name: '阻止公开', desc: '随机一名玩家本轮不能发布信息' } },
   { id: 'cleaner', name: '清除者', desc: '可以看到所有公开信息', skill: { id: 'deleteInfo', name: '清除情报', desc: '随机清除一名玩家的一条公开信息' } }
@@ -1436,36 +1438,37 @@ function applyIdentityToDeltas(room, deltas) {
     if (!trait) return;
     const isCoop = coopSet.includes(room.choices[p.id]);
     let d = deltas[p.id] || 0;
-    if (trait.id === 'disguiser') {
-      deltas[p.id] = d + 4;
+    if (trait.id === 'berserker') {
+      deltas[p.id] = Math.round(d * 1.2);
+    } else if (trait.id === 'raider') {
+      if (coopSet.length) deltas[p.id] = isCoop ? Math.round(d * 0.95) : Math.round(d * 1.15);
+    } else if (trait.id === 'miser') {
+      deltas[p.id] = Math.round(d * 0.9);
+    } else if (trait.id === 'ironwall') {
+      deltas[p.id] = Math.max(d, -15);
+    } else if (trait.id === 'gambler') {
+      const mult = 0.8 + Math.random() * 0.4;
+      deltas[p.id] = Math.round(d * mult);
+    } else if (trait.id === 'chosen') {
+      const mult = 1 + Math.random() * 0.15;
+      deltas[p.id] = Math.round(d * mult);
     } else if (trait.id === 'spy') {
       if (risk) deltas[p.id] = d + 6;
-    } else if (trait.id === 'trickster') {
-      if (coopSet.length) deltas[p.id] = isCoop ? d - 2 : d + (risk ? 7 : 5);
-    } else if (trait.id === 'aggressor') {
-      deltas[p.id] = d > 0 ? d + (risk ? 15 : 12) : d - (risk ? 15 : 12);
-    } else if (trait.id === 'conservative') {
-      const a = risk ? 6 : 4;
-      deltas[p.id] = d > 0 ? d - a : d + a;
-    } else if (trait.id === 'lucky') {
-      deltas[p.id] = d + (Math.floor(Math.random() * (risk ? 21 : 17)) - (risk ? 8 : 6));
-    } else if (trait.id === 'strategist') {
-      if (risk) deltas[p.id] = d + 7;
-    } else if (trait.id === 'forger') {
-      if (risk) deltas[p.id] = d + 5;
     }
   });
   if (room.activeSkillEffects) {
     room.players.forEach(p => {
       const skillId = room.activeSkillEffects[p.id];
       if (!skillId) return;
+      const isCoop = coopSet.includes(room.choices[p.id]);
       let d = deltas[p.id] || 0;
-      if (skillId === 'disguise') d += 8;
-      else if (skillId === 'peek') d += 4;
-      else if (skillId === 'lie') d += 6;
-      else if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
+      if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
+      else if (skillId === 'aggr_bonus' && coopSet.length && !isCoop) d += Math.round(d * 0.2);
       else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + 2;
-      else if (skillId === 'destiny') d += (Math.random() < 0.5 ? 15 : -5);
+      else if (skillId === 'shield_wall') d = Math.max(d, -5);
+      else if (skillId === 'destiny') d = Math.round(d * (Math.random() < 0.5 ? 1.3 : 0.8));
+      else if (skillId === 'blessing') d = d > 0 ? d + Math.round(d * 0.2) : d;
+      else if (skillId === 'peek') d += 4;
       deltas[p.id] = d;
     });
   }
@@ -1482,7 +1485,6 @@ function applyIdentityToDeltas(room, deltas) {
   deltas = applyStrategyCards(room, deltas);
   return deltas;
 }
-
 function applyHardModifier(room, result) {
   if (room.difficulty !== 'hard') return result;
   const mods = [
