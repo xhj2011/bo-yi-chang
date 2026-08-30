@@ -10,7 +10,8 @@ const TRAITS = [
   { id: 'aggressor', name: '激进者', desc: '你赚的时候多赚12分；你赔的时候再多赔12分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
   { id: 'conservative', name: '保守者', desc: '你赚的时候少赚4分；你赔的时候少赔4分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半；有收益时+2' } },
   { id: 'lucky', name: '幸运儿', desc: '结算随机浮动-6~+10分', skill: { id: 'destiny', name: '天命', desc: '本轮高波动：50% +15，50% -5' } },
-  { id: 'strategist', name: '谋略家', desc: '在拍卖/决斗/最后通牒/海盗等复杂事件中额外+7', skill: { id: 'puppet', name: '幕后推手', desc: '选择一名玩家，本轮若TA盈利，你获得其盈利的30%；若TA亏损，你无损失' } }
+  { id: 'strategist', name: '谋略家', desc: '在拍卖/决斗/最后通牒/海盗等复杂事件中额外+7', skill: { id: 'puppet', name: '幕后推手', desc: '选择一名玩家，本轮若TA盈利，你获得其盈利的30%；若TA亏损，你无损失' } },
+  { id: 'forger', name: '造假者', desc: '在复杂事件中额外+5；可以篡改他人公开信息', skill: { id: 'forge', name: '信息篡改', desc: '随机篡改一名玩家的公开信息' } }
 ];
 const COOP_ACTIONS = {
   prisoner: ['合作'],
@@ -706,6 +707,7 @@ function resolveUltimatumAll(room) {
       roles[pair.responderId] = '回应者';
     });
 
+  const publicDeltas = Object.assign({}, deltas);
   applyIdentityToDeltas(room, deltas);
   room.players.forEach(p => p.score += deltas[p.id] || 0);
   room.phase = 'reveal';
@@ -713,10 +715,11 @@ function resolveUltimatumAll(room) {
     type: 'reveal',
       roles,
     mode: 'ulti_all',
-    delta: deltas,
+    delta: publicDeltas,
     detail: lines.join('\n'),
     players: publicPlayers(room)
   });
+  sendPrivateResults(room, publicDeltas, deltas);
 }
 
 function startCentipede(room) {
@@ -961,8 +964,11 @@ function handleDuelAction(room, playerId, action) {
 }
 
 function finishDuel(room, deltas, detail) {
+  const publicDeltas = Object.assign({}, deltas);
+  applyIdentityToDeltas(room, deltas);
   const d = room.duel;
   room.players.forEach(p => {
+    d.publicTotalDeltas[p.id] = (d.publicTotalDeltas[p.id] || 0) + (publicDeltas[p.id] || 0);
     d.totalDeltas[p.id] = (d.totalDeltas[p.id] || 0) + (deltas[p.id] || 0);
     p.score += deltas[p.id] || 0;
   });
@@ -974,11 +980,12 @@ function finishDuel(room, deltas, detail) {
     broadcast(room, {
       type: 'reveal',
       mode: 'duel',
-      delta: d.totalDeltas,
+      delta: d.publicTotalDeltas,
       detail: '全部决斗结束',
       players: publicPlayers(room)
     });
   }
+    sendPrivateResults(room, d.publicTotalDeltas, d.totalDeltas);
 }
 
 function startRepeatedPrisoner(room) {
@@ -1028,8 +1035,10 @@ function resolveRepeatRound(room) {
     deltas[pair.bId] = db;
     lines.push(`${a.name}【${ca}】 vs ${b.name}【${cb}】：${a.name}${da>=0?'+':''}${da}，${b.name}${db>=0?'+':''}${db}`);
   });
+  const publicDeltas = Object.assign({}, deltas);
   applyIdentityToDeltas(room, deltas);
   room.players.forEach(p => p.score += deltas[p.id] || 0);
+  sendPrivateResults(room, publicDeltas, deltas);
   room.players.forEach(p => p.choice = null);
   room.choices = {};
   const finished = r.round >= r.maxRound;
@@ -1039,7 +1048,7 @@ function resolveRepeatRound(room) {
       type: 'reveal',
       mode: 'repeat',
         finished: true,
-      delta: deltas,
+      delta: publicDeltas,
       detail: `重复囚徒困境全部结束\n${lines.join('\n')}`,
       players: publicPlayers(room)
     });
@@ -1050,7 +1059,7 @@ function resolveRepeatRound(room) {
       type: 'reveal',
       mode: 'repeat',
         finished: false,
-      delta: deltas,
+      delta: publicDeltas,
       detail: `第${r.round - 1}轮结果：\n${lines.join('\n')}\n\n稍后进入第${r.round}轮…`,
       players: publicPlayers(room)
     });
@@ -1289,6 +1298,8 @@ function resolveAuction(room) {
   const deltas = {};
   room.players.forEach(p => deltas[p.id] = -bids[p.id]);
   winners.forEach(p => deltas[p.id] += winnerShare);
+  const publicDeltas = Object.assign({}, deltas);
+  applyIdentityToDeltas(room, deltas);
   room.players.forEach(p => p.score += deltas[p.id] || 0);
     const roles = {};
     room.players.forEach(p => roles[p.id] = '竞拍者');
@@ -1298,10 +1309,11 @@ function resolveAuction(room) {
       roles,
     type: 'reveal',
     mode: 'auction',
-    delta: deltas,
+    delta: publicDeltas,
     detail: `全支付拍卖：最高出价${maxBid}，${winners.map(w => w.name).join('、')}各得${winnerShare}`,
     players: publicPlayers(room)
   });
+  sendPrivateResults(room, publicDeltas, deltas);
 }
 
 
@@ -1405,6 +1417,11 @@ function applyStrategyCards(room, deltas) {
   });
   return deltas;
 }
+function sendPrivateResults(room, publicDeltas, actualDeltas) {
+  room.players.forEach(p => {
+    sendTo(room, p.id, { type: 'privateResult', actualDelta: actualDeltas[p.id] || 0, baseDelta: publicDeltas[p.id] || 0, score: p.score });
+  });
+}
 function applyIdentityToDeltas(room, deltas) {
   if (room.difficulty !== 'hard' || !room.traits) return deltas;
   const type = room.currentEvent ? room.currentEvent.type : '';
@@ -1431,6 +1448,8 @@ function applyIdentityToDeltas(room, deltas) {
       deltas[p.id] = d + (Math.floor(Math.random() * (risk ? 21 : 17)) - (risk ? 8 : 6));
     } else if (trait.id === 'strategist') {
       if (risk) deltas[p.id] = d + 7;
+    } else if (trait.id === 'forger') {
+      if (risk) deltas[p.id] = d + 5;
     }
   });
   if (room.activeSkillEffects) {
@@ -1675,6 +1694,25 @@ function handleMessage(ws, msg) {
         const others = room.players.filter(x => x.id !== player.id);
         if (others.length) {
           room.activeSkillTargets[player.id] = others[Math.floor(Math.random() * others.length)].id;
+        }
+      }
+      if (trait.id === 'forger') {
+        const others = room.players.filter(x => x.id !== player.id);
+        if (others.length) {
+          const target = others[Math.floor(Math.random() * others.length)];
+          const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
+          const fakeTrait = fakeTraits[Math.floor(Math.random() * fakeTraits.length)] || TRAITS[0];
+          const fakeCard = room.selectedCards[target.id] ? { name: room.selectedCards[target.id].name } : { name: '无' };
+          const fakeInfo = {
+            id: target.id,
+            name: target.name,
+            trait: { name: fakeTrait.name },
+            skill: { name: fakeTrait.skill.name },
+            card: fakeCard,
+            score: target.score
+          };
+          room.revealedInfo[target.id] = fakeInfo;
+          broadcast(room, { type: 'publicInfo', info: fakeInfo });
         }
       }
       if (trait.id === 'spy') {
