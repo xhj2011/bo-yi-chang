@@ -785,6 +785,21 @@ function handle(msg) {
       renderGame();
       break;
     }
+    case 'privateResult': {
+      window._privateResult = msg;
+      if (phase === 'reveal' && window._lastRevealMsg) renderReveal(window._lastRevealMsg);
+      break;
+    }
+    case 'publicInfo': {
+      const info = msg.info || {};
+      let text = `${info.name} 公开了信息：`;
+      if (info.trait) text += `身份=${info.trait.name}；`;
+      if (info.skill) text += `技能=${info.skill.name}；`;
+      if (info.card) text += `策略卡=${info.card.name}；`;
+      text += `当前分数=${info.score}`;
+      appendChat('系统', text);
+      break;
+    }
     case 'cardHand': {
       currentCards = msg.cards || [];
       selectedCard = null;
@@ -910,6 +925,7 @@ function handle(msg) {
 
     case 'reveal': {
       phase = 'reveal';
+      window._lastRevealMsg = msg;
       players = msg.players || players;
       if (msg.mode === 'ultimatum') {
         currentEvent = { name: '最后通牒', desc: '提议与回应结果' };
@@ -977,6 +993,7 @@ function renderGame() {
       html += `<button onclick="useSkill()" class="secondary">使用技能：${escapeHtml(myTrait.skill.name)}</button>`;
     }
   }
+  if (myTrait) html += `<button onclick="revealMyInfo()" class="secondary">公开我的所有信息</button>`;
   if (phase === 'trait_select') {
     const traits = window._traits || [];
     const progress = window._traitProgress || { done: 0, total: 0 };
@@ -1186,6 +1203,9 @@ function selectStrategyCard(cardId) {
   send({ type: 'selectCard', cardId });
   renderGame();
 }
+function revealMyInfo() {
+  send({ type: 'revealMyInfo' });
+}
 function useSkill() {
   if (!myTrait || !myTrait.skill || mySkillUsed) return;
   mySkillUsed = true;
@@ -1263,6 +1283,7 @@ function renderReveal(msg) {
   }
   body.innerHTML = `
     <div class="phase">本轮结算</div>
+    ${window._privateResult ? `<div class="phase" style="color:#a5b4fc;">你的实际收益：${window._privateResult.actualDelta}（公开显示 ${window._privateResult.baseDelta}），你的总分：${window._privateResult.score}</div>` : ''}
     <div class="warn">${escapeHtml(msg.detail || (msg.mode === 'ultimatum' ? (msg.accept ? '交易达成' : '交易破裂') : ''))}</div>
     ${rows}
     ${msg.mode === 'repeat' && msg.finished === false ? '' : (host ? '<button onclick="hostNext()">下一轮</button>' : '<p class="link">等待房主进入下一轮…</p>')}
@@ -1283,7 +1304,7 @@ function renderScores() {
   if (!players.length) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   document.getElementById('scoreboard').innerHTML = players.map(p =>
-    `<div class="score"><div class="name">${escapeHtml(p.name)}</div><div class="pts">${p.score}</div></div>`
+    `<div class="score"><div class="name">${escapeHtml(p.name)}</div><div class="pts">${p.id === myId ? p.score : '?'}</div></div>`
   ).join('');
   const n = players.length;
   const board = document.getElementById('scoreboard');

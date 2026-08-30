@@ -1488,18 +1488,24 @@ function resolveNormal(room) {
     result = room.twist.apply(room, result) || result;
   }
   result = applyHardModifier(room, result);
+  const baseDeltas = Object.assign({}, result.deltas);
+  const baseDetail = result.detail || '';
   result.deltas = applyIdentityToDeltas(room, result.deltas);
+  const actualDeltas = Object.assign({}, result.deltas);
   room.players.forEach(p => {
-    p.score += result.deltas[p.id] || 0;
+    p.score += actualDeltas[p.id] || 0;
   });
   room.phase = 'reveal';
   broadcast(room, {
     type: 'reveal',
     mode: 'normal',
     choices: room.choices,
-    delta: result.deltas,
-    detail: result.detail || '',
+    delta: baseDeltas,
+    detail: baseDetail,
     players: publicPlayers(room)
+  });
+  room.players.forEach(p => {
+    sendTo(room, p.id, { type: 'privateResult', actualDelta: actualDeltas[p.id] || 0, baseDelta: baseDeltas[p.id] || 0, score: p.score });
   });
 }
 
@@ -1619,6 +1625,7 @@ function handleMessage(ws, msg) {
         room.roundIndex = 0;
         if (room.difficulty === 'hard') {
           room.usedSkills = {};
+  room.revealedInfo = {};
           room.activeSkillEffects = {};
   room.activeSkillTargets = {};
           room.phase = 'trait_select';
@@ -1681,6 +1688,24 @@ function handleMessage(ws, msg) {
         }
       }
       broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 发动了主动技能` });
+      break;
+    }
+    case 'revealMyInfo': {
+      if (!room || room.difficulty !== 'hard' || !room.traits) return;
+      const player = room.players.find(p => p.id === ws.playerId);
+      if (!player) return;
+      const trait = room.traits[player.id];
+      const card = room.selectedCards[player.id];
+      const info = {
+        id: player.id,
+        name: player.name,
+        trait: trait ? { id: trait.id, name: trait.name, desc: trait.desc } : null,
+        skill: trait && trait.skill ? { id: trait.skill.id, name: trait.skill.name, desc: trait.skill.desc } : null,
+        card: card ? { id: card.id, name: card.name, desc: card.desc } : null,
+        score: player.score
+      };
+      room.revealedInfo[player.id] = info;
+      broadcast(room, { type: 'publicInfo', info });
       break;
     }
     case 'selectCard': {
