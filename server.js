@@ -551,6 +551,12 @@ function checkReadingComplete(room) {
   }
 }
 
+function checkTraitSelection(room) {
+  if (room.phase !== 'trait_select') return;
+  if (room.players.every(p => room.traits[p.id])) {
+    startRound(room);
+  }
+}
 function assignBotChoices(room) {
   const actions = room.currentEvent.actions || [];
   room.players.forEach(p => {
@@ -1485,13 +1491,7 @@ function handleMessage(ws, msg) {
     case 'start': {
       if (room && room.hostId === ws.playerId && room.phase === 'waiting' && room.players.length >= 2) {
         room.difficulty = ['easy', 'normal', 'hard'].includes(msg.difficulty) ? msg.difficulty : 'normal';
-        room.traits = null;
-        if (room.difficulty === 'hard') {
-          room.traits = {};
-          room.players.forEach(p => {
-            room.traits[p.id] = TRAITS[Math.floor(Math.random() * TRAITS.length)];
-          });
-        }
+        room.traits = {};
         let pool = EVENTS.filter(e => e.id !== 'chicken' && e.id !== 'commons' && e.id !== 'centipede' && e.id !== 'rps');
         if (room.difficulty === 'easy') {
           const easyIds = new Set(['prisoner', 'public', 'stag', 'volunteer', 'trust', 'minority']);
@@ -1499,7 +1499,18 @@ function handleMessage(ws, msg) {
         }
         room.deck = shuffle(pool).slice(0, 6);
         room.roundIndex = 0;
-        startRound(room);
+        if (room.difficulty === 'hard') {
+          room.phase = 'trait_select';
+          broadcast(room, { type: 'traitSelect', traits: TRAITS, players: publicPlayers(room) });
+          room.players.forEach(p => {
+            if (p.isBot) {
+              room.traits[p.id] = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+            }
+          });
+          broadcast(room, { type: 'traitProgress', done: Object.keys(room.traits).length, total: room.players.length });
+        } else {
+          startRound(room);
+        }
       }
       break;
     }
@@ -1511,6 +1522,18 @@ function handleMessage(ws, msg) {
         break;
       }
 
+    case 'selectTrait': {
+      if (!room || room.phase !== 'trait_select') return;
+      const player = room.players.find(p => p.id === ws.playerId);
+      if (!player) return;
+      const trait = TRAITS.find(t => t.id === msg.traitId);
+      if (!trait) return;
+      room.traits[player.id] = trait;
+      sendTo(room, player.id, { type: 'trait', trait });
+      broadcast(room, { type: 'traitProgress', done: Object.keys(room.traits).length, total: room.players.length });
+      checkTraitSelection(room);
+      break;
+    }
     case 'confirmRead': {
       if (!room || room.phase !== 'reading') return;
       const player = room.players.find(p => p.id === ws.playerId);

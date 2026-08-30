@@ -759,6 +759,19 @@ function handle(msg) {
       renderScores();
       break;
     }
+    case 'traitSelect': {
+      phase = 'trait_select';
+      myTrait = null;
+      window._traits = msg.traits || [];
+      window._traitProgress = { done: 0, total: (msg.players || []).length };
+      renderGame();
+      break;
+    }
+    case 'traitProgress': {
+      window._traitProgress = { done: msg.done, total: msg.total };
+      renderGame();
+      break;
+    }
     case 'trait': {
       myTrait = msg.trait || null;
       renderGame();
@@ -924,7 +937,18 @@ function renderGame() {
   const body = document.getElementById('gameBody');
   let html = '';
   if (myTrait) html += `<div class="phase" style="color:#a5b4fc;">🂠 你的隐藏身份：${escapeHtml(myTrait.name)}（${escapeHtml(myTrait.desc)}）</div>`;
-  if (phase === 'reading') {
+  if (phase === 'trait_select') {
+    const traits = window._traits || [];
+    const progress = window._traitProgress || { done: 0, total: 0 };
+    html += `<div class="phase">身份选择阶段 · 已选择 ${progress.done}/${progress.total}</div>
+      <p>请选择你的隐藏身份，只有你自己知道。</p>`;
+    if (myTrait) {
+      html += `<p class="link">你已选择：${escapeHtml(myTrait.name)}</p>
+        <p class="link">等待其他玩家选择…</p>`;
+    } else {
+      html += `<div class="actions">${traits.map(t => `<div class="action-card" onclick="selectTrait('${t.id}')">${escapeHtml(t.name)}<br><small style="font-size:12px;">${escapeHtml(t.desc)}</small></div>`).join('')}</div>`;
+    }
+  } else if (phase === 'reading') {
     html += `<div class="phase">阅读阶段 · 已确认 ${readingInfo.read}/${readingInfo.total}</div>
       <p>请先仔细阅读上方规则，确认理解后再进入讨论。</p>`;
     if (readConfirmed) {
@@ -1115,6 +1139,13 @@ window.centipedeAction = function (action) {
 
 }
 
+function selectTrait(id) {
+  const t = (window._traits || []).find(x => x.id === id);
+  if (!t) return;
+  myTrait = t;
+  send({ type: 'selectTrait', traitId: id });
+  renderGame();
+}
 function confirmRead() {
   readConfirmed = true;
   send({ type: 'confirmRead' });
@@ -1152,7 +1183,7 @@ function hostNext() {
 }
 
 function phaseLabelText() {
-  return phase === 'discussion' ? '讨论阶段' : phase === 'reading' ? '阅读阶段' :
+  return phase === 'discussion' ? '讨论阶段' : phase === 'reading' ? '阅读阶段' : phase === 'trait_select' ? '身份选择' :
          phase === 'choosing' ? '选择阶段' : phase === 'repeat_choosing' ? '重复囚徒困境' :
          phase === 'ultimatum_propose' ? '提议阶段' :
          phase === 'ultimatum_respond' ? '回应阶段' :
