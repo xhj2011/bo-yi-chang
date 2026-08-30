@@ -22,6 +22,22 @@ const COOP_ACTIONS = {
   cournot: ['低产量']
 };
 
+const STRATEGY_CARDS = [
+  { id: 'shield', name: '保险', rarity: 'common', color: '#94a3b8', desc: '本轮你的损失减半', effect: 'shield' },
+  { id: 'focus', name: '专注', rarity: 'common', color: '#94a3b8', desc: '本轮额外+3', effect: 'focus' },
+  { id: 'boost', name: '加注', rarity: 'rare', color: '#60a5fa', desc: '本轮收益+5', effect: 'boost' },
+  { id: 'disrupt', name: '干扰', rarity: 'rare', color: '#60a5fa', desc: '随机一名其他玩家本轮-3', effect: 'disrupt' },
+  { id: 'gamble', name: '豪赌', rarity: 'epic', color: '#c084fc', desc: '本轮随机-5~+15', effect: 'gamble' },
+  { id: 'coop_card', name: '合作卡', rarity: 'rare', color: '#60a5fa', desc: '本轮如果选择合作类行动，收益+10', effect: 'coop_bonus' },
+  { id: 'aggr_card', name: '进攻卡', rarity: 'rare', color: '#f87171', desc: '本轮如果选择背叛/进攻类行动，收益+10', effect: 'aggr_bonus' },
+  { id: 'prisoner_letter', name: '狱中密信', event: 'prisoner', rarity: 'rare', color: '#60a5fa', desc: '囚徒困境：本轮合作收益+12', effect: 'coop_bonus' },
+  { id: 'public_support', name: '村长支持', event: 'public', rarity: 'rare', color: '#60a5fa', desc: '公共品：本轮投入收益+12', effect: 'coop_bonus' },
+  { id: 'stag_track', name: '追踪术', event: 'stag', rarity: 'rare', color: '#60a5fa', desc: '猎鹿：本轮猎鹿收益+12', effect: 'coop_bonus' },
+  { id: 'volunteer_lamp', name: '守夜人', event: 'volunteer', rarity: 'rare', color: '#60a5fa', desc: '灯塔：本轮站出来收益+12', effect: 'coop_bonus' },
+  { id: 'trust_help', name: '央行支持', event: 'trust', rarity: 'rare', color: '#60a5fa', desc: '银行：本轮继续投资收益+12', effect: 'coop_bonus' },
+  { id: 'minority_oracle', name: '先知', event: 'minority', rarity: 'epic', color: '#c084fc', desc: '少数者：如果你在少数方，额外+15', effect: 'minority_bonus' },
+  { id: 'cournot_dump', name: '低价倾销', event: 'cournot', rarity: 'rare', color: '#60a5fa', desc: '古诺：本轮低产量收益+12', effect: 'coop_bonus' }
+];
 const EVENT_TWISTS = {
   public: [
     { id: 'mayor_reward', name: '村长的奖励', desc: '随机一名投入者额外+15，没人投入则没有奖励。', apply(room, result) {
@@ -541,6 +557,14 @@ function startRound(room) {
     });
   }
   // Bots automatically finish reading; humans click “我已读完”.
+  room.cardHands = {};
+  room.selectedCards = {};
+  room.players.forEach(p => {
+    const pool = STRATEGY_CARDS.filter(c => !c.event || c.event === room.currentEvent.id);
+    const hand = shuffle(pool.slice()).slice(0, 3);
+    room.cardHands[p.id] = hand;
+    sendTo(room, p.id, { type: 'cardHand', cards: hand });
+  });
   room.players.forEach(p => {
     if (p.isBot) room.readConfirmed[p.id] = true;
   });
@@ -1343,6 +1367,40 @@ function startChoice(room) {
   }
 }
 
+function applyStrategyCards(room, deltas) {
+  if (!room.selectedCards) return deltas;
+  const eventId = room.currentEvent ? room.currentEvent.id : '';
+  const coopSet = COOP_ACTIONS[eventId] || [];
+  room.players.forEach(p => {
+    const card = room.selectedCards[p.id];
+    if (!card) return;
+    let d = deltas[p.id] || 0;
+    if (card.effect === 'shield') d = d < 0 ? Math.round(d / 2) : d;
+    else if (card.effect === 'focus') d += 3;
+    else if (card.effect === 'boost') d += 5;
+    else if (card.effect === 'gamble') d += (Math.floor(Math.random() * 21) - 5);
+    else if (card.effect === 'coop_bonus' && coopSet.includes(room.choices[p.id])) d += 10;
+    else if (card.effect === 'aggr_bonus' && coopSet.length && !coopSet.includes(room.choices[p.id])) d += 10;
+    else if (card.effect === 'minority_bonus' && eventId === 'minority') {
+      const a = room.players.filter(x => room.choices[x.id] === 'A').length;
+      const b = room.players.length - a;
+      const isMinor = (room.choices[p.id] === 'A' && a < b) || (room.choices[p.id] === 'B' && b < a);
+      if (isMinor) d += 15;
+    }
+    deltas[p.id] = d;
+  });
+  // 干扰：随机给一名其他玩家减分
+  room.players.forEach(p => {
+    const card = room.selectedCards[p.id];
+    if (!card || card.effect !== 'disrupt') return;
+    const others = room.players.filter(x => x.id !== p.id);
+    if (others.length) {
+      const target = others[Math.floor(Math.random() * others.length)];
+      deltas[target.id] = (deltas[target.id] || 0) - 3;
+    }
+  });
+  return deltas;
+}
 function applyIdentityToDeltas(room, deltas) {
   if (room.difficulty !== 'hard' || !room.traits) return deltas;
   const type = room.currentEvent ? room.currentEvent.type : '';
@@ -1395,6 +1453,7 @@ function applyIdentityToDeltas(room, deltas) {
       }
     });
   }
+  deltas = applyStrategyCards(room, deltas);
   return deltas;
 }
 
@@ -1618,6 +1677,16 @@ function handleMessage(ws, msg) {
         }
       }
       broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 发动了主动技能` });
+      break;
+    }
+    case 'selectCard': {
+      if (!room || !room.cardHands) return;
+      const player = room.players.find(p => p.id === ws.playerId);
+      if (!player) return;
+      const card = (room.cardHands[player.id] || []).find(c => c.id === msg.cardId);
+      if (!card || room.selectedCards[player.id]) return;
+      room.selectedCards[player.id] = card;
+      sendTo(room, player.id, { type: 'cardSelected', card });
       break;
     }
     case 'confirmRead': {

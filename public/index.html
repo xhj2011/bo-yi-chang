@@ -668,6 +668,7 @@ let ultimatumAnswered = null;
 let readConfirmed = false;
 let myTrait = null;
 let mySkillUsed = false;
+let currentCards = [];
 let readingInfo = { read: 0, total: 0 };
 
 function connect() {
@@ -777,6 +778,25 @@ function handle(msg) {
     }
     case 'spyInfo': {
       window._spyInfo = msg;
+  if (currentCards.length && phase !== 'trait_select') {
+    if (selectedCard) {
+      html += `<p class="link">已选择策略卡：${escapeHtml(selectedCard.name)}（${escapeHtml(selectedCard.desc)}）</p>`;
+    } else {
+      html += `<div class="phase">策略卡 · 选择一张，不使用则作废</div>
+        <div class="actions">${currentCards.map(c => `<div class="action-card" onclick="selectStrategyCard('${c.id}')" style="border-color:${escapeHtml(c.color || '#94a3b8')}; background:rgba(20,25,35,.9);">${escapeHtml(c.name)}<br><small style="font-size:11px;">${escapeHtml(c.desc)}</small></div>`).join('')}</div>`;
+    }
+  }
+      renderGame();
+      break;
+    }
+    case 'cardHand': {
+      currentCards = msg.cards || [];
+      selectedCard = null;
+      renderGame();
+      break;
+    }
+    case 'cardSelected': {
+      selectedCard = msg.card || null;
       renderGame();
       break;
     }
@@ -1155,6 +1175,13 @@ window.centipedeAction = function (action) {
 
 }
 
+function selectStrategyCard(cardId) {
+  const card = currentCards.find(c => c.id === cardId);
+  if (!card || selectedCard) return;
+  selectedCard = card;
+  send({ type: 'selectCard', cardId });
+  renderGame();
+}
 function useSkill() {
   if (!myTrait || !myTrait.skill || mySkillUsed) return;
   mySkillUsed = true;
