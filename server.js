@@ -9,7 +9,7 @@ const TRAITS = [
   { id: 'aggressive', name: '激进者', desc: '你赚的时候多赚10分；你赔的时候再多赔10分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
   { id: 'conservative', name: '保守者', desc: '你赚的时候少赚5分；你赔的时候少赔5分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
   { id: 'lucky', name: '幸运儿', desc: '每次结算在原本结果上随机浮动-5到+8分', skill: { id: 'destiny', name: '天命', desc: '本轮额外获得0~12分' } },
-  { id: 'steady', name: '稳健者', desc: '免疫全局随机波动；收益+3，单轮损失最多-10', skill: { id: 'steady_gain', name: '锁定收益', desc: '本轮收益锁定：至少+8，不会亏损' } }
+  { id: 'steady', name: '稳健者', desc: '免疫全局随机波动；收益+2，单轮损失最多-15', skill: { id: 'steady_gain', name: '风险闸', desc: '本轮损失最多-5；若为正则额外+5' } }
 ];
 
 
@@ -1333,35 +1333,6 @@ function startChoice(room) {
   }
 }
 
-function applyTrait(room, result) {
-  if (room.difficulty !== 'hard' || !room.traits) return result;
-  room.players.forEach(p => {
-    const trait = room.traits[p.id];
-    if (!trait) return;
-    const d = result.deltas[p.id] || 0;
-    if (trait.id === 'aggressive') result.deltas[p.id] = d > 0 ? d + 10 : d - 10;
-    else if (trait.id === 'conservative') result.deltas[p.id] = d > 0 ? d - 5 : d + 5;
-    else if (trait.id === 'lucky') result.deltas[p.id] = d + (Math.floor(Math.random() * 14) - 5);
-    else if (trait.id === 'steady') result.deltas[p.id] = d > 0 ? d + 4 : d - 4;
-  });
-  return result;
-}
-
-function applyActiveSkills(room, result) {
-  if (!room.activeSkillEffects) return result;
-  room.players.forEach(p => {
-    const skillId = room.activeSkillEffects[p.id];
-    if (!skillId) return;
-    let d = result.deltas[p.id] || 0;
-    if (skillId === 'all_in') d = Math.round(d * 1.5);
-    else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d;
-    else if (skillId === 'destiny') d += Math.floor(Math.random() * 13);
-    else if (skillId === 'steady_gain') d += 8;
-    result.deltas[p.id] = d;
-  });
-  return result;
-}
-
 function applyIdentityToDeltas(room, deltas) {
   if (room.difficulty !== 'hard' || !room.traits) return deltas;
   const type = room.currentEvent ? room.currentEvent.type : '';
@@ -1379,8 +1350,9 @@ function applyIdentityToDeltas(room, deltas) {
     } else if (trait.id === 'lucky') {
       deltas[p.id] = d + (Math.floor(Math.random() * (risk ? 21 : 14)) - (risk ? 8 : 5));
     } else if (trait.id === 'steady') {
-      const a = risk ? 5 : 4;
-      deltas[p.id] = d > 0 ? d + a : d - a;
+      const a = risk ? 3 : 2;
+      if (d > 0) deltas[p.id] = d + a;
+      else deltas[p.id] = Math.max(d + a, -15);
     }
   });
   if (room.activeSkillEffects) {
@@ -1391,7 +1363,7 @@ function applyIdentityToDeltas(room, deltas) {
       if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
       else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + (risk ? 5 : 3);
       else if (skillId === 'destiny') d += (Math.random() < 0.5 ? 15 : -5);
-      else if (skillId === 'steady_gain') d = Math.max(d, 0) + 8;
+      else if (skillId === 'steady_gain') d = d < 0 ? Math.max(d, -5) : d + 5;
       deltas[p.id] = d;
     });
   }
