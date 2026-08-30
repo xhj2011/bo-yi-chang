@@ -768,6 +768,10 @@ function handle(msg) {
       mySkillUsed = false;
       window._traits = msg.traits || [];
       window._traitProgress = { done: 0, total: (msg.players || []).length };
+      document.getElementById('lobby').classList.add('hidden');
+      document.getElementById('game').classList.remove('hidden');
+      document.getElementById('scorePanel').classList.remove('hidden');
+      document.querySelector('.container').classList.add('in-game');
       renderGame();
       break;
     }
@@ -778,14 +782,6 @@ function handle(msg) {
     }
     case 'spyInfo': {
       window._spyInfo = msg;
-  if (currentCards.length && phase !== 'trait_select') {
-    if (selectedCard) {
-      html += `<p class="link">已选择策略卡：${escapeHtml(selectedCard.name)}（${escapeHtml(selectedCard.desc)}）</p>`;
-    } else {
-      html += `<div class="phase">策略卡 · 选择一张，不使用则作废</div>
-        <div class="actions">${currentCards.map(c => `<div class="action-card" onclick="selectStrategyCard('${c.id}')" style="border-color:${escapeHtml(c.color || '#94a3b8')}; background:rgba(20,25,35,.9);">${escapeHtml(c.name)}<br><small style="font-size:11px;">${escapeHtml(c.desc)}</small></div>`).join('')}</div>`;
-    }
-  }
       renderGame();
       break;
     }
@@ -967,6 +963,14 @@ function renderGame() {
   if (myTrait) html += `<div class="phase" style="color:#a5b4fc;">🂠 你的隐藏身份：${escapeHtml(myTrait.name)}（${escapeHtml(myTrait.desc)}）</div>`;
   if (myTrait && myTrait.skill && phase !== 'trait_select') {
   if (window._spyInfo) html += `<p class="link">🕵️ 你窥探到 ${escapeHtml(window._spyInfo.name)} 的身份是：${escapeHtml(window._spyInfo.trait.name)}</p>`;
+  if (currentCards.length && phase !== 'trait_select') {
+    if (selectedCard) {
+      html += `<p class="link">已选择策略卡：${escapeHtml(selectedCard.name)}（${escapeHtml(selectedCard.desc)}）</p>`;
+    } else {
+      html += `<div class="phase">策略卡 · 选择一张，不使用则作废</div>
+        <div class="actions">${currentCards.map(c => `<div class="action-card" onclick="selectStrategyCard('${c.id}')" style="border-color:${escapeHtml(c.color || '#94a3b8')}; background:rgba(20,25,35,.9);">${escapeHtml(c.name)}<br><small style="font-size:11px;">${escapeHtml(c.desc)}</small></div>`).join('')}</div>`;
+    }
+  }
     if (mySkillUsed) {
       html += `<p class="link">身份技能已使用：${escapeHtml(myTrait.skill.name)}</p>`;
     } else {
