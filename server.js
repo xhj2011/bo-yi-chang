@@ -569,6 +569,7 @@ function startRound(room) {
   room.activeSkillEffects = {};
   room.activeSkillTargets = {};
   room.blockedPublish = {};
+  room.publishCountThisRound = 0;
   room.choices = {};
   room.currentEvent = room.deck[room.roundIndex];
   room.ultimatum = null;
@@ -1727,6 +1728,7 @@ function handleMessage(ws, msg) {
           room.activeSkillEffects = {};
   room.activeSkillTargets = {};
   room.blockedPublish = {};
+  room.publishCountThisRound = 0;
           room.phase = 'trait_select';
           broadcast(room, { type: 'traitSelect', traits: TRAITS, players: publicPlayers(room) });
           room.players.forEach(p => {
@@ -1768,6 +1770,10 @@ function handleMessage(ws, msg) {
       if (!player) return;
       const trait = room.traits[player.id];
       if (!trait || !trait.skill) return;
+      if (['info_broker','censor','cleaner'].includes(trait.id) && !(room.publishCountThisRound > 0)) {
+        send(ws, { type: 'error', message: '请先有人公布信息后才能发动情报技能' });
+        return;
+      }
       if (room.usedSkills[player.id]) return;
       room.usedSkills[player.id] = true;
       room.activeSkillEffects[player.id] = trait.skill.id;
@@ -1855,6 +1861,7 @@ function handleMessage(ws, msg) {
         player.score -= 10;
       }
       room.infoActions[player.id] = used + 1;
+      room.publishCountThisRound = (room.publishCountThisRound || 0) + 1;
       if (!room.publicInfo[player.id]) room.publicInfo[player.id] = {};
       const trait = room.traits[player.id];
       if (category === 'identity' && trait) {
