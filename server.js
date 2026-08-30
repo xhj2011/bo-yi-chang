@@ -9,7 +9,7 @@ const TRAITS = [
   { id: 'aggressive', name: '激进者', desc: '你赚的时候多赚10分；你赔的时候再多赔10分', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益和损失都放大1.5倍' } },
   { id: 'conservative', name: '保守者', desc: '你赚的时候少赚5分；你赔的时候少赔5分', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
   { id: 'lucky', name: '幸运儿', desc: '每次结算在原本结果上随机浮动-5到+8分', skill: { id: 'destiny', name: '天命', desc: '本轮额外获得0~12分' } },
-  { id: 'steady', name: '稳健者', desc: '你赚的时候多赚4分；你赔的时候少赔4分', skill: { id: 'steady_gain', name: '稳赚', desc: '本轮固定额外+8分' } }
+  { id: 'steady', name: '稳健者', desc: '免疫全局随机波动；收益+3，单轮损失最多-10', skill: { id: 'steady_gain', name: '锁定收益', desc: '本轮收益锁定：至少+8，不会亏损' } }
 ];
 
 
@@ -1391,7 +1391,7 @@ function applyIdentityToDeltas(room, deltas) {
       if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
       else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + (risk ? 5 : 3);
       else if (skillId === 'destiny') d += (Math.random() < 0.5 ? 15 : -5);
-      else if (skillId === 'steady_gain') d += 8;
+      else if (skillId === 'steady_gain') d = Math.max(d, 0) + 8;
       deltas[p.id] = d;
     });
   }
@@ -1407,6 +1407,10 @@ function applyHardModifier(room, result) {
   ];
   const mod = mods[Math.floor(Math.random() * mods.length)];
   room.players.forEach(p => {
+    const trait = room.traits && room.traits[p.id];
+    const isSteady = trait && trait.id === 'steady';
+    const isLocked = room.activeSkillEffects && room.activeSkillEffects[p.id] === 'steady_gain';
+    if (isSteady || isLocked) return;
     result.deltas[p.id] = (result.deltas[p.id] || 0) + mod.delta;
   });
   result.detail = (result.detail || '') + `\n【困难随机事件】${mod.name}：全员${mod.delta > 0 ? '+' : ''}${mod.delta}分`;
@@ -1419,8 +1423,8 @@ function resolveNormal(room) {
   if (room.twist && typeof room.twist.apply === 'function') {
     result = room.twist.apply(room, result) || result;
   }
-  result = applyTrait(room, applyHardModifier(room, result));
-  result = applyActiveSkills(room, result);
+  result = applyHardModifier(room, result);
+  result.deltas = applyIdentityToDeltas(room, result.deltas);
   room.players.forEach(p => {
     p.score += result.deltas[p.id] || 0;
   });
