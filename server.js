@@ -2019,6 +2019,7 @@ function handleMessage(ws, msg) {
         room.luckInsurance[player.id] = true;
         broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 购买了本轮好运保险` });
       }
+      sendTo(room, player.id, { type: 'skillUsed', skillId: skill.id });
       broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 发动了主动技能：${skill.name}` });
       break;
     }

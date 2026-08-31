@@ -848,6 +848,12 @@ function handle(msg) {
       renderGame();
       break;
     }
+    case 'skillUsed': {
+      mySkillUsed = true;
+      selectedSkill = null;
+      renderGame();
+      break;
+    }
     case 'luckInfo': {
       window._luckPoints = msg.points;
       renderGame();
@@ -1300,7 +1306,6 @@ function useSkillTarget(skillId, targetId) {
 }
 function useSkillNow(skillId, targetId) {
   if (!myTrait || mySkillUsed) return;
-  mySkillUsed = true;
   selectedSkill = null;
   send({ type: 'useSkill', skillId, targetId });
   renderGame();
