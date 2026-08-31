@@ -591,6 +591,45 @@ function addBot(room) {
 }
 
 
+function botUseClassSkill(room, player) {
+  const trait = room.traits && room.traits[player.id];
+  if (!trait || !Array.isArray(trait.skills) || !trait.skills.length) return;
+  if (room.usedClassSkills && room.usedClassSkills[player.id]) return;
+  const skill = trait.skills[Math.floor(Math.random() * trait.skills.length)];
+  let targetId = null;
+  if (skill.target === 'player') {
+    const others = room.players.filter(x => x.id !== player.id);
+    if (others.length) targetId = others[Math.floor(Math.random() * others.length)].id;
+  }
+  const fakeWs = { roomCode: room.code, playerId: player.id, readyState: 0 };
+  handleMessage(fakeWs, { type: 'useSkill', skillId: skill.id, targetId });
+}
+
+function botPublishInfo(room, player) {
+  if (!player || player.isBot !== true) return;
+  if (room.botInfoUsed && room.botInfoUsed[player.id]) return;
+  if (room.blockedPublish && room.blockedPublish[player.id]) return;
+  const cats = ['identity', 'skill', 'score'];
+  const category = cats[Math.floor(Math.random() * cats.length)];
+  const trait = room.traits && room.traits[player.id];
+  if (category === 'identity' && !trait) return;
+  if (category === 'skill' && (!trait || !Array.isArray(trait.skills) || !trait.skills.length)) return;
+  if (!room.pendingInfo[player.id]) room.pendingInfo[player.id] = { identity: null, skill: null, score: null };
+  if (category === 'identity') {
+    room.pendingInfo[player.id].identity = { value: trait.name, desc: trait.desc, pending: true };
+  } else if (category === 'skill') {
+    room.pendingInfo[player.id].skill = { value: trait.skills.map(x => x.name).join('、'), desc: trait.passive || '', pending: true };
+  } else {
+    room.pendingInfo[player.id].score = { value: player.score, pending: true };
+  }
+  room.botInfoUsed[player.id] = true;
+  room.publishCountThisRound = (room.publishCountThisRound || 0) + 1;
+  if (room.infoActions[player.id] == null) room.infoActions[player.id] = 0;
+  room.infoActions[player.id]++;
+  broadcastPendingInfo(room);
+  broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 提交了一条待公开信息` });
+}
+
 function startRound(room) {
   clearTimeout(room.discussionTimer);
   room.readConfirmed = {};
@@ -602,6 +641,8 @@ function startRound(room) {
   room.usedClassSkills = {};
   room.classEffects = {};
   room.classTargets = {};
+  room.infoActions = {};
+  room.botInfoUsed = {};
   room.pendingInfo = {};
   room.protectedInfo = {};
   if (!room.luckPointsSet) {
@@ -661,6 +702,20 @@ function startRound(room) {
   room.players.forEach(p => {
     if (p.isBot) room.readConfirmed[p.id] = true;
   });
+  if (room.difficulty === 'hard') {
+    room.players.forEach(p => {
+      if (!p.isBot) return;
+      setTimeout(() => {
+        if (room.phase === 'reading' || room.phase === 'discussion') botPublishInfo(room, p);
+      }, 800 + Math.floor(Math.random() * 2500));
+      const trait = room.traits[p.id];
+      if (trait && trait.classType !== 'intel') {
+        setTimeout(() => {
+          if (room.phase === 'reading' || room.phase === 'discussion') botUseClassSkill(room, p);
+        }, 3000 + Math.floor(Math.random() * 4000));
+      }
+    });
+  }
   checkReadingComplete(room);
 }
 
@@ -1472,6 +1527,13 @@ function startIntelligencePhase(room) {
   room.intelligenceStart = Date.now();
   broadcast(room, { type: 'intelligenceOpen', count: countPendingInfo(room), players: publicPlayers(room) });
   broadcastPendingInfo(room);
+  room.players.forEach(p => {
+    if (p.isBot && room.traits[p.id] && room.traits[p.id].classType === 'intel') {
+      setTimeout(() => {
+        if (room.phase === 'intelligence') botUseClassSkill(room, p);
+      }, 1000 + Math.floor(Math.random() * 2000));
+    }
+  });
   clearTimeout(room.intelligenceTimer);
   room.intelligenceTimer = setTimeout(() => {
     if (room.phase === 'intelligence') endIntelligencePhase(room);
