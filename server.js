@@ -11,9 +11,9 @@ const TRAITS = [
   { id: 'breaker', name: '破军', desc: '风险事件收益+15%', skill: { id: 'breakthrough', name: '破釜沉舟', desc: '本轮收益×1.5' } },
   { id: 'daredevil', name: '赌命者', desc: '收益为正+10%，为负再-10%', skill: { id: 'double_or_nothing', name: '赌命', desc: '50%收益×2 / 50%损失×2' } },
   { id: 'miser', name: '守财奴', desc: '收益-10%，损失-10%', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
-  { id: 'ironwall', name: '铁壁', desc: '单轮损失最多-20分', skill: { id: 'shield_wall', name: '绝对防御', desc: '本轮损失最多-10分' } },
+  { id: 'ironwall', name: '铁壁', desc: '损失减少20%', skill: { id: 'shield_wall', name: '绝对防御', desc: '本轮损失减少50%' } },
   { id: 'steady_earner', name: '稳赚者', desc: '每轮额外+3', skill: { id: 'steady_gain', name: '稳赚', desc: '本轮额外+8' } },
-  { id: 'safe_harbor', name: '避风港', desc: '免疫全局随机波动', skill: { id: 'safe_haven', name: '避风', desc: '本轮损失最多-8分' } },
+  { id: 'safe_harbor', name: '避风港', desc: '免疫全局随机波动', skill: { id: 'safe_haven', name: '避风', desc: '本轮损失减少50%' } },
   { id: 'gambler', name: '赌徒', desc: '收益随机±20%', skill: { id: 'destiny', name: '豪赌', desc: '50% +30% / 50% -20%' } },
   { id: 'chosen', name: '天选者', desc: '收益随机0~+15%', skill: { id: 'blessing', name: '天命', desc: '本轮额外+20%' } },
   { id: 'madman', name: '疯子', desc: '收益随机-25%～+35%', skill: { id: 'crazy', name: '疯狂', desc: '本轮随机-30%～+50%' } },
@@ -37,7 +37,7 @@ const STRATEGY_CARDS = [
   { id: 'shield', name: '保险', rarity: 'common', color: '#94a3b8', desc: '本轮你的损失减半', effect: 'shield' },
   { id: 'focus', name: '专注', rarity: 'common', color: '#94a3b8', desc: '本轮额外+3', effect: 'focus' },
   { id: 'small_gain', name: '小赚', rarity: 'common', color: '#94a3b8', desc: '本轮额外+4', effect: 'small_gain' },
-  { id: 'stop_loss', name: '止损', rarity: 'common', color: '#94a3b8', desc: '本轮亏损最多-5', effect: 'stop_loss' },
+  { id: 'stop_loss', name: '止损', rarity: 'common', color: '#94a3b8', desc: '本轮损失减少30%', effect: 'stop_loss' },
   { id: 'boost', name: '加注', rarity: 'common', color: '#94a3b8', desc: '本轮收益+5', effect: 'boost' },
   { id: 'prisoner_letter', name: '狱中密信', event: 'prisoner', rarity: 'common', color: '#94a3b8', value: 6, desc: '囚徒困境：本轮合作收益+6', effect: 'coop_bonus' },
   { id: 'public_support', name: '村长支持', event: 'public', rarity: 'common', color: '#94a3b8', value: 6, desc: '公共品：本轮投入收益+6', effect: 'coop_bonus' },
@@ -1442,7 +1442,7 @@ function applyStrategyCards(room, deltas) {
     else if (card.effect === 'focus') d += 3;
     else if (card.effect === 'boost') d += 5;
     else if (card.effect === 'small_gain') d += 4;
-    else if (card.effect === 'stop_loss') d = d < 0 ? Math.max(d, -5) : d;
+    else if (card.effect === 'stop_loss') d = d < 0 ? Math.round(d * 0.7) : d;
     else if (card.effect === 'gamble') d += (Math.floor(Math.random() * ((card.value || 20) + 9)) - 8);
     else if (card.effect === 'coop_bonus' && coopSet.includes(room.choices[p.id])) d += (card.value || 10);
     else if (card.effect === 'aggr_bonus' && coopSet.length && !coopSet.includes(room.choices[p.id])) d += (card.value || 10);
@@ -1487,7 +1487,7 @@ function applyIdentityToDeltas(room, deltas) {
     else if (trait.id === 'breaker' && risk) deltas[p.id] = Math.round(d * 1.15);
     else if (trait.id === 'daredevil') deltas[p.id] = Math.round(d * 1.1);
     else if (trait.id === 'miser') deltas[p.id] = Math.round(d * 0.9);
-    else if (trait.id === 'ironwall') deltas[p.id] = Math.max(d, -20);
+    else if (trait.id === 'ironwall') deltas[p.id] = d < 0 ? Math.round(d * 0.8) : d;
     else if (trait.id === 'steady_earner') deltas[p.id] = d + 3;
     else if (trait.id === 'safe_harbor') { /* 免疫随机在 applyHardModifier 处理 */ }
     else if (trait.id === 'gambler') deltas[p.id] = Math.round(d * (0.8 + Math.random() * 0.4));
@@ -1507,9 +1507,9 @@ function applyIdentityToDeltas(room, deltas) {
       else if (skillId === 'breakthrough') d = d > 0 ? Math.round(d * 1.5) : d;
       else if (skillId === 'double_or_nothing') d = Math.round(d * (Math.random() < 0.5 ? 2 : 0.5));
       else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + 2;
-      else if (skillId === 'shield_wall') d = Math.max(d, -10);
+      else if (skillId === 'shield_wall') d = d < 0 ? Math.round(d * 0.5) : d;
       else if (skillId === 'steady_gain') d += 8;
-      else if (skillId === 'safe_haven') d = Math.max(d, -8);
+      else if (skillId === 'safe_haven') d = d < 0 ? Math.round(d * 0.5) : d;
       else if (skillId === 'destiny') d = Math.round(d * (Math.random() < 0.5 ? 1.3 : 0.8));
       else if (skillId === 'blessing') d = d > 0 ? d + Math.round(d * 0.2) : d;
       else if (skillId === 'crazy') d = Math.round(d * (0.7 + Math.random() * 0.8));
@@ -1659,7 +1659,7 @@ const httpServer = http.createServer((req, res) => {
       '.js': 'application/javascript; charset=utf-8',
       '.css': 'text/css; charset=utf-8'
     }[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': mime });
+    res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'no-cache' });
     res.end(data);
   });
   });
@@ -1722,6 +1722,7 @@ function handleMessage(ws, msg) {
         room.roundIndex = 0;
         if (room.difficulty === 'hard') {
           room.usedSkills = {};
+  room.usedInfoSkills = {};
   room.revealedInfo = {};
   room.publicInfo = {};
   room.infoActions = {};
@@ -1770,12 +1771,13 @@ function handleMessage(ws, msg) {
       if (!player) return;
       const trait = room.traits[player.id];
       if (!trait || !trait.skill) return;
-      if (['info_broker','censor','cleaner'].includes(trait.id) && !(room.publishCountThisRound > 0)) {
+      if (['info_broker','censor','cleaner','spy'].includes(trait.id) && !(room.publishCountThisRound > 0)) {
         send(ws, { type: 'error', message: '请先有人公布信息后才能发动情报技能' });
         return;
       }
-      if (room.usedSkills[player.id]) return;
-      room.usedSkills[player.id] = true;
+      if (room.usedSkills[player.id] || room.usedInfoSkills[player.id]) return;
+      const isInfoSkill = ['info_broker','censor','cleaner','spy'].includes(trait.id);
+      if (isInfoSkill) room.usedInfoSkills[player.id] = true; else room.usedSkills[player.id] = true;
       room.activeSkillEffects[player.id] = trait.skill.id;
       if (trait.id === 'strategist') {
         const others = room.players.filter(x => x.id !== player.id);

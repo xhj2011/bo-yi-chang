@@ -1227,7 +1227,11 @@ function revealMyInfo() {
   send({ type: 'revealMyInfo' });
 }
 function useSkill() {
+  const infoRoles = ["info_broker", "censor", "cleaner", "spy"];
   if (!myTrait || !myTrait.skill || mySkillUsed) return;
+  if (infoRoles.includes(myTrait.id)) {
+    if (!confirm('确定使用情报技能？会消耗这次情报机会，且无法与普通身份技能同时使用。')) return;
+  }
   mySkillUsed = true;
   send({ type: 'useSkill' });
   renderGame();
