@@ -940,8 +940,9 @@ function startDuel(room) {
       currentId: a.id
     });
   }
-  room.duel = { pairs, pairIndex: 0, pairCount: pairs.length, totalDeltas: {} };
+  room.duel = { pairs, pairIndex: 0, pairCount: pairs.length, totalDeltas: {}, publicTotalDeltas: {} };
   room.players.forEach(p => room.duel.totalDeltas[p.id] = 0);
+  room.players.forEach(p => room.duel.publicTotalDeltas[p.id] = 0);
   room.players.forEach(p => {
     const pair = pairs.find(x => x.aId === p.id || x.bId === p.id);
     if (pair) {
