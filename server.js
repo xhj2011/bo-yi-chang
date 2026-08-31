@@ -1771,7 +1771,7 @@ function handleMessage(ws, msg) {
       if (!player) return;
       const trait = room.traits[player.id];
       if (!trait || !trait.skill) return;
-      if (['info_broker','censor','cleaner','spy'].includes(trait.id) && !(room.publishCountThisRound > 0)) {
+      if (trait.id === 'cleaner' && !(room.publishCountThisRound > 0)) {
         send(ws, { type: 'error', message: '请先有人公布信息后才能发动情报技能' });
         return;
       }
