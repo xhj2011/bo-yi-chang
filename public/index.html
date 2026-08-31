@@ -675,6 +675,9 @@ let myTrait = null;
 let mySkillUsed = false;
 let currentCards = [];
 let readingInfo = { read: 0, total: 0 };
+let selectedSkill = null;
+let pendingInfo = null;
+let pendingInfoCount = 0;
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -752,6 +755,9 @@ function handle(msg) {
       readConfirmed = false;
       myTrait = null;
       mySkillUsed = false;
+      selectedSkill = null;
+      pendingInfo = null;
+      pendingInfoCount = 0;
       readingInfo = { read: 0, total: (msg.players || []).length };
         scoreAnimated = false;
       document.getElementById('lobby').classList.add('hidden');
@@ -771,6 +777,9 @@ function handle(msg) {
       phase = 'trait_select';
       myTrait = null;
       mySkillUsed = false;
+      selectedSkill = null;
+      pendingInfo = null;
+      pendingInfoCount = 0;
       window._traits = msg.traits || [];
       window._traitProgress = { done: 0, total: (msg.players || []).length };
       document.getElementById('lobby').classList.add('hidden');
@@ -812,6 +821,36 @@ function handle(msg) {
       const catName = msg.category === 'identity' ? '身份' : msg.category === 'skill' ? '技能' : '分数';
       appendChat('系统', `【情报板】${msg.name} 公布${catName}：${msg.value}`);
       renderInfoBoard();
+      break;
+    }
+    case 'pendingInfo': {
+      pendingInfo = msg.data || {};
+      pendingInfoCount = msg.count || 0;
+      renderInfoBoard();
+      renderGame();
+      break;
+    }
+    case 'pendingInfoCount': {
+      pendingInfoCount = msg.count || 0;
+      renderInfoBoard();
+      break;
+    }
+    case 'intelligenceOpen': {
+      phase = 'intelligence';
+      renderGame();
+      renderInfoBoard();
+      break;
+    }
+    case 'intelligenceEnd': {
+      pendingInfo = null;
+      pendingInfoCount = 0;
+      renderInfoBoard();
+      renderGame();
+      break;
+    }
+    case 'luckInfo': {
+      window._luckPoints = msg.points;
+      renderGame();
       break;
     }
     case 'cardHand': {
@@ -991,27 +1030,38 @@ function renderGame() {
   const body = document.getElementById('gameBody');
   let html = '';
   if (myTrait) html += `<div class="phase" style="color:#a5b4fc;">🂠 你的隐藏身份：${escapeHtml(myTrait.name)}（${escapeHtml(myTrait.desc)}）</div>`;
-  if (myTrait && myTrait.skill && (phase === 'reading' || phase === 'discussion')) {
-  if (window._spyInfo) html += `<p class="link">🕵️ 你窥探到 ${escapeHtml(window._spyInfo.name)} 的身份是：${escapeHtml(window._spyInfo.trait.name)}</p>`;
-  if (currentCards.length && phase !== 'trait_select') {
-    if (selectedCard) {
-      html += `<p class="link">已选择策略卡：${escapeHtml(selectedCard.name)}（${escapeHtml(selectedCard.desc)}）</p>`;
+if (myTrait && myTrait.passive) html += `<p class="link">被动：${escapeHtml(myTrait.passive)}</p>`;
+if (window._spyInfo) html += `<p class="link">🕵️ 你窥探到 ${escapeHtml(window._spyInfo.name)} 的身份是：${escapeHtml(window._spyInfo.trait.name)}</p>`;
+if (currentCards.length && phase !== 'trait_select') {
+  if (selectedCard) {
+    html += `<p class="link">已选择策略卡：${escapeHtml(selectedCard.name)}（${escapeHtml(selectedCard.desc)}）</p>`;
+  } else {
+    html += `<div class="phase">策略卡 · 选择一张，不使用则作废</div>
+      <div class="actions">${currentCards.map(c => `<div class="action-card" onclick="selectStrategyCard('${c.id}')" style="border-color:${escapeHtml(c.color || '#94a3b8')}; background:rgba(20,25,35,.9);">${escapeHtml(c.name)}<br><small style="font-size:11px;">${escapeHtml(c.desc)}</small></div>`).join('')}</div>`;
+  }
+}
+if (myTrait && Array.isArray(myTrait.skills) && (phase === 'reading' || phase === 'discussion' || phase === 'intelligence')) {
+  const isIntel = myTrait.classType === 'intel';
+  if (isIntel && phase !== 'intelligence') {
+    html += `<p class="link">🕵️ 你是情报者，情报技能将在情报阶段使用。</p>`;
+  } else if (!mySkillUsed) {
+    if (selectedSkill) {
+      const sk = myTrait.skills.find(x => x.id === selectedSkill);
+      if (sk) {
+        html += `<p class="link">选择目标：${escapeHtml(sk.name)}</p><div class="actions">${players.filter(p => p.id !== myId).map(p => `<div class="action-card" onclick="useSkillTarget('${sk.id}','${p.id}')">${escapeHtml(p.name)}</div>`).join('')}</div>`;
+      }
     } else {
-      html += `<div class="phase">策略卡 · 选择一张，不使用则作废</div>
-        <div class="actions">${currentCards.map(c => `<div class="action-card" onclick="selectStrategyCard('${c.id}')" style="border-color:${escapeHtml(c.color || '#94a3b8')}; background:rgba(20,25,35,.9);">${escapeHtml(c.name)}<br><small style="font-size:11px;">${escapeHtml(c.desc)}</small></div>`).join('')}</div>`;
+      html += `<div class="actions">${myTrait.skills.map(s => `<div class="action-card" onclick="selectSkill('${s.id}')">⚡ ${escapeHtml(s.name)}<br><small style="font-size:11px;">${escapeHtml(s.desc)}</small></div>`).join('')}</div>`;
     }
   }
-    if (mySkillUsed) {
-      html += `<p class="link">身份技能已使用：${escapeHtml(myTrait.skill.name)}</p>`;
-    } else {
-      html += `<button onclick="useSkill()" class="secondary">⚡ 可发动技能：${escapeHtml(myTrait.skill.name)}</button>`;
-    }
-  }
-  if (myTrait) html += `<button onclick="revealMyInfo()" class="secondary">公开我的所有信息</button>`;
-  if (myTrait && phase !== 'trait_select') html += `<button onclick="publishInfo('identity')" class="secondary">公布身份</button>`;
-  if (myTrait && (phase === 'reading' || phase === 'discussion' || phase === 'choosing')) html += `<button onclick="publishInfo('skill')" class="secondary">公布技能/策略</button>`;
-  if (phase === 'reveal') html += `<button onclick="publishInfo('score')" class="secondary">公布分数</button>`;
-  if (phase === 'trait_select') {
+}
+if (mySkillUsed) html += `<p class="link">本回合主动技能已使用</p>`;
+if (myTrait && myTrait.classType === 'lucky' && window._luckPoints != null) html += `<p class="link">🍀 好运点：${window._luckPoints}</p>`;
+if (myTrait) html += `<button onclick="revealMyInfo()" class="secondary">公开我的所有信息</button>`;
+if (myTrait && phase !== 'trait_select') html += `<button onclick="publishInfo('identity')" class="secondary">公布身份</button>`;
+if (myTrait && (phase === 'reading' || phase === 'discussion' || phase === 'intelligence' || phase === 'choosing')) html += `<button onclick="publishInfo('skill')" class="secondary">公布技能/策略</button>`;
+if (phase === 'reveal') html += `<button onclick="publishInfo('score')" class="secondary">公布分数</button>`;
+if (phase === 'trait_select') {
     const traits = window._traits || [];
     const progress = window._traitProgress || { done: 0, total: 0 };
     html += `<div class="phase">身份选择阶段 · 已选择 ${progress.done}/${progress.total}</div>
@@ -1020,7 +1070,7 @@ function renderGame() {
       html += `<p class="link">你已选择：${escapeHtml(myTrait.name)}</p>
         <p class="link">等待其他玩家选择…</p>`;
     } else {
-      html += `<div class="actions">${traits.map(t => `<div class="action-card" onclick="selectTrait('${t.id}')">${escapeHtml(t.name)}<br><small style="font-size:12px;">${escapeHtml(t.desc)}</small></div>`).join('')}</div>`;
+      html += `<div class="actions">${traits.map(t => `<div class="action-card" onclick="selectTrait('${t.id}')">${escapeHtml(t.name)}<br><small style="font-size:12px;">${escapeHtml(t.desc)}</small><br><small style="font-size:11px;color:#f6d67a;">${(t.skills || []).map(x => escapeHtml(x.name)).join(' / ')}</small></div>`).join('')}</div>`;
     }
   } else if (phase === 'reading') {
     html += `<div class="phase">阅读阶段 · 已确认 ${readingInfo.read}/${readingInfo.total}</div>
@@ -1040,6 +1090,15 @@ function renderGame() {
       html += `<button onclick="send({type:'startChoice'})">开始本轮选择</button>`;
     } else {
       html += `<p class="link">等待房主开始选择…</p>`;
+    }
+  } else if (phase === 'intelligence') {
+    html += `<div class="phase">🕵️ 情报阶段</div>
+      <p>情报角色正在处理待公开信息，处理完成后才会正式公开。</p>
+      ${pendingInfoCount > 0 ? `<p class="link">当前有 ${pendingInfoCount} 条待公开信息。</p>` : '<p class="link">当前没有待公开信息。</p>'}`;
+    if (host) {
+      html += `<button onclick="send({type:'startChoice'})">结束情报阶段并开始选择</button>`;
+    } else {
+      html += `<p class="link">等待房主结束情报阶段…</p>`;
     }
   } else if (phase === 'choosing' || phase === 'repeat_choosing') {
     const acts = currentEvent.actions || [];
@@ -1226,14 +1285,24 @@ function publishInfo(category) {
 function revealMyInfo() {
   send({ type: 'revealMyInfo' });
 }
-function useSkill() {
-  const infoRoles = ["info_broker", "censor", "cleaner", "spy"];
-  if (!myTrait || !myTrait.skill || mySkillUsed) return;
-  if (infoRoles.includes(myTrait.id)) {
-    if (!confirm('确定使用情报技能？会消耗这次情报机会，且无法与普通身份技能同时使用。')) return;
+function selectSkill(skillId) {
+  const skill = (myTrait && myTrait.skills || []).find(s => s.id === skillId);
+  if (!skill || mySkillUsed) return;
+  if (skill.target === 'player') {
+    selectedSkill = skillId;
+    renderGame();
+  } else {
+    useSkillNow(skillId, null);
   }
+}
+function useSkillTarget(skillId, targetId) {
+  useSkillNow(skillId, targetId);
+}
+function useSkillNow(skillId, targetId) {
+  if (!myTrait || mySkillUsed) return;
   mySkillUsed = true;
-  send({ type: 'useSkill' });
+  selectedSkill = null;
+  send({ type: 'useSkill', skillId, targetId });
   renderGame();
 }
 function selectTrait(id) {
@@ -1280,7 +1349,7 @@ function hostNext() {
 }
 
 function phaseLabelText() {
-  return phase === 'discussion' ? '讨论阶段' : phase === 'reading' ? '阅读阶段' : phase === 'trait_select' ? '身份选择' :
+  return phase === 'intelligence' ? '情报阶段' : phase === 'discussion' ? '讨论阶段' : phase === 'reading' ? '阅读阶段' : phase === 'trait_select' ? '身份选择' :
          phase === 'choosing' ? '选择阶段' : phase === 'repeat_choosing' ? '重复囚徒困境' :
          phase === 'ultimatum_propose' ? '提议阶段' :
          phase === 'ultimatum_respond' ? '回应阶段' :
@@ -1429,9 +1498,22 @@ function renderInfoBoard() {
   if (!board || !list) return;
   const data = window._infoBoard || {};
   const ids = Object.keys(data);
-  if (!ids.length) { board.classList.add('hidden'); list.innerHTML = ''; return; }
-  board.classList.remove('hidden');
   let html = '';
+  if (pendingInfo && Object.keys(pendingInfo).length) {
+    html += `<div style="color:#f6d67a;border-bottom:1px solid #d9a75f;margin-bottom:6px;">⏳ 待公开情报（仅情报者可见详情）</div>`;
+    Object.keys(pendingInfo).forEach(pid => {
+      const e = pendingInfo[pid];
+      const p = players.find(x => x.id === pid);
+      const name = p ? p.name : '';
+      const lines = [];
+      if (e && e.identity) lines.push(`身份：${escapeHtml(e.identity.value)}${e.identity.modified ? ' ⚠️' : ''}`);
+      if (e && e.skill) lines.push(`技能：${escapeHtml(e.skill.value)}${e.skill.modified ? ' ⚠️' : ''}`);
+      if (e && e.score != null) lines.push(`分数：${e.score.value}${e.score.modified ? ' ⚠️' : ''}`);
+      html += `<div><b>${escapeHtml(name)}</b>：${lines.join('；') || '暂无'}</div>`;
+    });
+  } else if (pendingInfoCount > 0) {
+    html += `<div style="color:#f6d67a;border-bottom:1px solid #d9a75f;margin-bottom:6px;">⏳ 当前有 ${pendingInfoCount} 条待公开情报（详情仅情报者可见）</div>`;
+  }
   ids.forEach(id => {
     const e = data[id];
     const lines = [];
@@ -1440,6 +1522,8 @@ function renderInfoBoard() {
     if (e.score != null) lines.push(`分数：${e.score.value}${e.score.modified ? ' ⚠️' : ''}`);
     html += `<div><b>${escapeHtml(e.name || '')}</b>：${lines.join('；') || '暂无'}</div>`;
   });
+  if (!html) { board.classList.add('hidden'); list.innerHTML = ''; return; }
+  board.classList.remove('hidden');
   list.innerHTML = html;
 }
 function escapeHtml(str) {

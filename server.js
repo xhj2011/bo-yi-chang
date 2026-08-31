@@ -6,22 +6,51 @@ const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const TRAITS = [
-  { id: 'berserker', name: '狂战士', desc: '收益+20%，损失+20%', skill: { id: 'all_in', name: '孤注一掷', desc: '本轮收益/损失×1.5，风险事件×2' } },
-  { id: 'raider', name: '掠夺者', desc: '背叛/进攻收益+15%，合作收益-5%', skill: { id: 'aggr_bonus', name: '掠夺', desc: '本轮背叛/进攻收益再+20%' } },
-  { id: 'breaker', name: '破军', desc: '风险事件收益+15%', skill: { id: 'breakthrough', name: '破釜沉舟', desc: '本轮收益×1.5' } },
-  { id: 'daredevil', name: '赌命者', desc: '收益为正+10%，为负再-10%', skill: { id: 'double_or_nothing', name: '赌命', desc: '50%收益×2 / 50%损失×2' } },
-  { id: 'miser', name: '守财奴', desc: '收益-10%，损失-10%', skill: { id: 'insurance', name: '保险', desc: '本轮损失减半' } },
-  { id: 'ironwall', name: '铁壁', desc: '损失减少20%', skill: { id: 'shield_wall', name: '绝对防御', desc: '本轮损失减少50%' } },
-  { id: 'steady_earner', name: '稳赚者', desc: '每轮额外+3', skill: { id: 'steady_gain', name: '稳赚', desc: '本轮额外+8' } },
-  { id: 'safe_harbor', name: '避风港', desc: '免疫全局随机波动', skill: { id: 'safe_haven', name: '避风', desc: '本轮损失减少50%' } },
-  { id: 'gambler', name: '赌徒', desc: '收益随机±20%', skill: { id: 'destiny', name: '豪赌', desc: '50% +30% / 50% -20%' } },
-  { id: 'chosen', name: '天选者', desc: '收益随机0~+15%', skill: { id: 'blessing', name: '天命', desc: '本轮额外+20%' } },
-  { id: 'madman', name: '疯子', desc: '收益随机-25%～+35%', skill: { id: 'crazy', name: '疯狂', desc: '本轮随机-30%～+50%' } },
-  { id: 'fate_gambler', name: '命运赌徒', desc: '20%概率收益×1.5', skill: { id: 'fate_roll', name: '赌命', desc: '50% +25 / 50% -15分' } },
-  { id: 'spy', name: '间谍', desc: '复杂事件中额外+6', skill: { id: 'peek', name: '窥探', desc: '随机查看一名其他玩家的身份，并获得+4' } },
-  { id: 'info_broker', name: '情报商', desc: '开局额外+1情报行动', skill: { id: 'forge', name: '编造假情报', desc: '随机生成一条假公开信息' } },
-  { id: 'censor', name: '审查者', desc: '可以看到被修改过的信息', skill: { id: 'block', name: '阻止公开', desc: '随机一名玩家本轮不能发布信息' } },
-  { id: 'cleaner', name: '清除者', desc: '可以看到所有公开信息', skill: { id: 'deleteInfo', name: '清除情报', desc: '随机清除一名玩家的一条公开信息' } }
+  {
+    id: 'aggressive', name: '激进者', classType: 'aggressive',
+    desc: '先发制人：多个技能同时作用时你优先结算；你的主动技能不会被反制。',
+    passive: '先发制人',
+    skills: [
+      { id: 'strike', name: '强攻', desc: '目标本轮-10分', target: 'player' },
+      { id: 'suppress', name: '压制', desc: '目标本轮不能使用主动技能', target: 'player' },
+      { id: 'plunder', name: '掠夺', desc: '自己+5分，目标-5分', target: 'player' },
+      { id: 'allout', name: '破釜沉舟', desc: '本轮你获得正面效果时加成50%，但放弃防御', target: 'self' }
+    ]
+  },
+  {
+    id: 'conservative', name: '保守者', classType: 'conservative',
+    desc: '稳如泰山：你受到的负面效果减少30%；每局自动免疫一次攻击。',
+    passive: '稳如泰山',
+    skills: [
+      { id: 'stop_loss', name: '止损', desc: '取消你本轮即将受到的一个负面效果', target: 'self' },
+      { id: 'iron_wall', name: '铁壁', desc: '本轮免疫所有针对你的技能', target: 'self' },
+      { id: 'counter', name: '反击', desc: '本轮若有人攻击你，对其造成同样反伤', target: 'self' },
+      { id: 'guard', name: '守护', desc: '替一名玩家承受一次负面效果', target: 'player' }
+    ]
+  },
+  {
+    id: 'lucky', name: '幸运者', classType: 'lucky',
+    desc: '好运点：每局3点，关键随机效果时可消耗，每轮最多用1点。',
+    passive: '好运点',
+    skills: [
+      { id: 'reroll', name: '改命', desc: '消耗1好运点，重抽本轮全局随机事件且不会更差', target: 'self' },
+      { id: 'destiny', name: '天选', desc: '消耗2好运点，本轮随机事件对你必定有利', target: 'self' },
+      { id: 'transfer_luck', name: '好运转移', desc: '把自己1个好运点送给一名玩家', target: 'player' },
+      { id: 'luck_insurance', name: '好运保险', desc: '本轮若受到负面随机效果，回合结束返还+5', target: 'self' }
+    ]
+  },
+  {
+    id: 'intel', name: '情报者', classType: 'intel',
+    desc: '情报网：情报阶段看到所有待公开信息及操作痕迹；自己发布的信息免疫其他情报角色破坏技能。',
+    passive: '情报网',
+    skills: [
+      { id: 'peek', name: '窥探', desc: '查看一名玩家的真实身份', target: 'player' },
+      { id: 'forge', name: '伪造', desc: '发布一条针对某玩家的假情报', target: 'player' },
+      { id: 'cleanse', name: '清除', desc: '删除一名玩家的一条待公开信息', target: 'player' },
+      { id: 'censor', name: '审查', desc: '阻止一名玩家本轮发布信息', target: 'player' },
+      { id: 'notarize', name: '公证', desc: '保护一名玩家的一条待公开信息，本阶段不可被删除/篡改/判假', target: 'player' }
+    ]
+  }
 ];
 const COOP_ACTIONS = {
   prisoner: ['合作'],
@@ -570,6 +599,26 @@ function startRound(room) {
   room.activeSkillTargets = {};
   room.blockedPublish = {};
   room.publishCountThisRound = 0;
+  room.usedClassSkills = {};
+  room.classEffects = {};
+  room.classTargets = {};
+  room.pendingInfo = {};
+  room.protectedInfo = {};
+  if (!room.luckPointsSet) {
+    room.luckPoints = {};
+    room.players.forEach(p => { room.luckPoints[p.id] = 3; });
+    room.luckPointsSet = true;
+  } else {
+    room.players.forEach(p => { if (room.luckPoints[p.id] == null) room.luckPoints[p.id] = 3; });
+  }
+  room.intelligencePhase = false;
+  clearTimeout(room.intelligenceTimer);
+  room.intelligenceTimer = null;
+  room.currentHardMod = null;
+  room.destinyPlayer = null;
+  room.luckInsurance = {};
+  room.luckInsuranceHit = {};
+  room.suppressed = {};
   room.choices = {};
   room.currentEvent = room.deck[room.roundIndex];
   room.ultimatum = null;
@@ -597,6 +646,7 @@ function startRound(room) {
     room.players.forEach(p => {
       const t = room.traits[p.id];
       if (t) sendTo(room, p.id, { type: 'trait', trait: t });
+      if (t && t.classType === 'lucky') sendTo(room, p.id, { type: 'luckInfo', points: room.luckPoints[p.id] });
     });
   }
   // Bots automatically finish reading; humans click “我已读完”.
@@ -1388,48 +1438,115 @@ function grantDiscussionReward(room) {
   });
   broadcast(room, { type: 'chat', name: '系统', text: `🎉 讨论活跃奖励：${names.join('、')} 各 +${reward} 分` });
 }
-function startChoice(room) {
+function countPendingInfo(room) {
+  let n = 0;
+  Object.keys(room.pendingInfo || {}).forEach(pid => {
+    const e = room.pendingInfo[pid] || {};
+    ['identity','skill','score'].forEach(cat => { if (e[cat]) n++; });
+  });
+  return n;
+}
+
+function pendingSnapshot(room) {
+  return JSON.parse(JSON.stringify(room.pendingInfo || {}));
+}
+
+function broadcastPendingInfo(room) {
+  const data = pendingSnapshot(room);
+  const count = countPendingInfo(room);
+  room.players.forEach(p => {
+    const t = room.traits && room.traits[p.id];
+    if (t && t.classType === 'intel') {
+      sendTo(room, p.id, { type: 'pendingInfo', data, count, phase: room.phase });
+    } else {
+      sendTo(room, p.id, { type: 'pendingInfoCount', count });
+    }
+  });
+}
+
+function startIntelligencePhase(room) {
   if (room.phase !== 'discussion') return;
   clearTimeout(room.discussionTimer);
-  grantDiscussionReward(room);
+  room.phase = 'intelligence';
+  room.intelligenceStart = Date.now();
+  broadcast(room, { type: 'intelligenceOpen', count: countPendingInfo(room), players: publicPlayers(room) });
+  broadcastPendingInfo(room);
+  clearTimeout(room.intelligenceTimer);
+  room.intelligenceTimer = setTimeout(() => {
+    if (room.phase === 'intelligence') endIntelligencePhase(room);
+  }, 30000);
+}
+
+function endIntelligencePhase(room) {
+  if (room.phase !== 'intelligence') return;
+  clearTimeout(room.intelligenceTimer);
+  room.intelligenceTimer = null;
+  room.intelligencePhase = false;
+  Object.keys(room.pendingInfo || {}).forEach(pid => {
+    const player = room.players.find(x => x.id === pid);
+    const entry = room.pendingInfo[pid] || {};
+    if (!room.publicInfo[pid]) room.publicInfo[pid] = { name: player ? player.name : '', identity: null, skill: null, score: null };
+    ['identity','skill','score'].forEach(cat => {
+      if (entry[cat]) {
+        room.publicInfo[pid][cat] = entry[cat];
+        broadcast(room, { type: 'publicInfo', playerId: pid, name: player ? player.name : '', category: cat, value: entry[cat].value, modified: !!entry[cat].modified, forged: !!entry[cat].forged, protected: !!entry[cat].protected, pending: false });
+      }
+    });
+  });
+  room.pendingInfo = {};
+  broadcast(room, { type: 'intelligenceEnd', count: 0 });
+  proceedFromDiscussion(room);
+}
+
+function proceedFromDiscussion(room) {
   if (room.currentEvent.type === 'duel') {
-      startDuel(room);
-    } else if (room.currentEvent.type === 'centipede') {
-      startCentipede(room);
-    } else if (room.currentEvent.type === 'repeat') {
-      startRepeatedPrisoner(room);
-    } else if (room.currentEvent.type === 'pirate') {
-      startPirate(room);
-    } else if (room.currentEvent.type === 'auction') {
-      startAuction(room);
-    } else if (room.currentEvent.type === 'ultimatum') {
+    startDuel(room);
+  } else if (room.currentEvent.type === 'centipede') {
+    startCentipede(room);
+  } else if (room.currentEvent.type === 'repeat') {
+    startRepeatedPrisoner(room);
+  } else if (room.currentEvent.type === 'pirate') {
+    startPirate(room);
+  } else if (room.currentEvent.type === 'auction') {
+    startAuction(room);
+  } else if (room.currentEvent.type === 'ultimatum') {
     startUltimatum(room);
   } else {
     room.phase = 'choosing';
-      if (room.currentEvent.id === 'prisoner') {
-        const shuffled = shuffle(room.players);
-        room.pairs = {};
-        for (let i = 0; i + 1 < shuffled.length; i += 2) {
-          const a = shuffled[i], b = shuffled[i + 1];
-          room.pairs[a.id] = { opponentId: b.id, opponentName: b.name };
-          room.pairs[b.id] = { opponentId: a.id, opponentName: a.name };
-        }
+    if (room.currentEvent.id === 'prisoner') {
+      const shuffled = shuffle(room.players);
+      room.pairs = {};
+      for (let i = 0; i + 1 < shuffled.length; i += 2) {
+        const a = shuffled[i], b = shuffled[i + 1];
+        room.pairs[a.id] = { opponentId: b.id, opponentName: b.name };
+        room.pairs[b.id] = { opponentId: a.id, opponentName: a.name };
       }
+    }
     assignBotChoices(room);
     broadcast(room, {
       type: 'choiceOpen',
       event: publicEvent(room.currentEvent),
       players: publicPlayers(room)
     });
-      if (room.pairs) {
-        room.players.forEach(p => {
-          const o = room.pairs[p.id];
-          if (o) sendTo(room, p.id, { type: 'opponent', opponentId: o.opponentId, opponentName: o.opponentName });
-        });
-      }
+    if (room.pairs) {
+      room.players.forEach(p => {
+        const o = room.pairs[p.id];
+        if (o) sendTo(room, p.id, { type: 'opponent', opponentId: o.opponentId, opponentName: o.opponentName });
+      });
+    }
   }
 }
 
+function startChoice(room) {
+  if (room.phase !== 'discussion') return;
+  clearTimeout(room.discussionTimer);
+  grantDiscussionReward(room);
+  if (room.difficulty === 'hard' && countPendingInfo(room) > 0) {
+    startIntelligencePhase(room);
+    return;
+  }
+  proceedFromDiscussion(room);
+}
 function applyStrategyCards(room, deltas) {
   if (!room.selectedCards) return deltas;
   const eventId = room.currentEvent ? room.currentEvent.id : '';
@@ -1473,93 +1590,102 @@ function sendPrivateResults(room, publicDeltas, actualDeltas) {
 }
 function applyIdentityToDeltas(room, deltas) {
   if (room.difficulty !== 'hard' || !room.traits) return deltas;
-  const type = room.currentEvent ? room.currentEvent.type : '';
-  const eventId = room.currentEvent ? room.currentEvent.id : '';
-  const risk = ['auction', 'duel', 'ultimatum', 'pirate'].includes(type);
-  const coopSet = COOP_ACTIONS[eventId] || [];
   room.players.forEach(p => {
     const trait = room.traits[p.id];
     if (!trait) return;
-    const isCoop = coopSet.includes(room.choices[p.id]);
     let d = deltas[p.id] || 0;
-    if (trait.id === 'berserker') deltas[p.id] = Math.round(d * 1.2);
-    else if (trait.id === 'raider' && coopSet.length) deltas[p.id] = isCoop ? Math.round(d * 0.95) : Math.round(d * 1.15);
-    else if (trait.id === 'breaker' && risk) deltas[p.id] = Math.round(d * 1.15);
-    else if (trait.id === 'daredevil') deltas[p.id] = Math.round(d * 1.1);
-    else if (trait.id === 'miser') deltas[p.id] = Math.round(d * 0.9);
-    else if (trait.id === 'ironwall') deltas[p.id] = d < 0 ? Math.round(d * 0.8) : d;
-    else if (trait.id === 'steady_earner') deltas[p.id] = d + 3;
-    else if (trait.id === 'safe_harbor') { /* 免疫随机在 applyHardModifier 处理 */ }
-    else if (trait.id === 'gambler') deltas[p.id] = Math.round(d * (0.8 + Math.random() * 0.4));
-    else if (trait.id === 'chosen') deltas[p.id] = Math.round(d * (1 + Math.random() * 0.15));
-    else if (trait.id === 'madman') deltas[p.id] = Math.round(d * (0.75 + Math.random() * 0.6));
-    else if (trait.id === 'fate_gambler') deltas[p.id] = Math.random() < 0.2 ? Math.round(d * 1.5) : d;
-    else if (trait.id === 'spy' && risk) deltas[p.id] = d + 6;
+    if (trait.classType === 'conservative' && d < 0) {
+      deltas[p.id] = Math.round(d * 0.7);
+    }
   });
-  if (room.activeSkillEffects) {
-    room.players.forEach(p => {
-      const skillId = room.activeSkillEffects[p.id];
-      if (!skillId) return;
-      const isCoop = coopSet.includes(room.choices[p.id]);
-      let d = deltas[p.id] || 0;
-      if (skillId === 'all_in') d = Math.round(d * (risk ? 2 : 1.5));
-      else if (skillId === 'aggr_bonus' && coopSet.length && !isCoop) d += Math.round(d * 0.2);
-      else if (skillId === 'breakthrough') d = d > 0 ? Math.round(d * 1.5) : d;
-      else if (skillId === 'double_or_nothing') d = Math.round(d * (Math.random() < 0.5 ? 2 : 0.5));
-      else if (skillId === 'insurance') d = d < 0 ? Math.round(d / 2) : d + 2;
-      else if (skillId === 'shield_wall') d = d < 0 ? Math.round(d * 0.5) : d;
-      else if (skillId === 'steady_gain') d += 8;
-      else if (skillId === 'safe_haven') d = d < 0 ? Math.round(d * 0.5) : d;
-      else if (skillId === 'destiny') d = Math.round(d * (Math.random() < 0.5 ? 1.3 : 0.8));
-      else if (skillId === 'blessing') d = d > 0 ? d + Math.round(d * 0.2) : d;
-      else if (skillId === 'crazy') d = Math.round(d * (0.7 + Math.random() * 0.8));
-      else if (skillId === 'fate_roll') d += (Math.random() < 0.5 ? 25 : -15);
-      else if (skillId === 'peek') d += 4;
-      deltas[p.id] = d;
-    });
-  }
-  if (room.activeSkillTargets) {
-    room.players.forEach(p => {
-      const skillId = room.activeSkillEffects && room.activeSkillEffects[p.id];
-      const targetId = room.activeSkillTargets[p.id];
-      if (skillId === 'puppet' && targetId) {
-        const targetDelta = deltas[targetId] || 0;
-        if (targetDelta > 0) deltas[p.id] = (deltas[p.id] || 0) + Math.round(targetDelta * 0.3);
-      }
-    });
-  }
+  // Targeted active class skills
+  const classEffects = room.classEffects || {};
+  const classTargets = room.classTargets || {};
+  const protectedSet = room.protectedInfo || {};
+  const guardMap = {};
+  room.players.forEach(p => {
+    const sk = classEffects[p.id];
+    const tgt = classTargets[p.id];
+    if (sk === 'guard' && tgt) guardMap[tgt] = p.id;
+  });
+  const attacks = [];
+  room.players.forEach(p => {
+    const sk = classEffects[p.id];
+    const tgt = classTargets[p.id];
+    if (sk === 'strike' && tgt) attacks.push({ from: p.id, to: tgt, amount: -10 });
+    if (sk === 'plunder' && tgt) {
+      deltas[p.id] = (deltas[p.id] || 0) + 5;
+      attacks.push({ from: p.id, to: tgt, amount: -5 });
+    }
+  });
+  attacks.forEach(a => {
+    const targetTrait = room.traits[a.to];
+    const guarder = guardMap[a.to];
+    if (targetTrait && (classEffects[a.to] === 'iron_wall')) return;
+    if (guarder) {
+      deltas[guarder] = (deltas[guarder] || 0) + a.amount;
+      return;
+    }
+    deltas[a.to] = (deltas[a.to] || 0) + a.amount;
+    // Counter: if victim has counter active, reflect to attacker
+    if (classEffects[a.to] === 'counter') {
+      deltas[a.from] = (deltas[a.from] || 0) + a.amount;
+    }
+  });
+  // Self effects
+  room.players.forEach(p => {
+    const sk = classEffects[p.id];
+    let d = deltas[p.id] || 0;
+    if (sk === 'allout') d = d > 0 ? Math.round(d * 1.5) : d;
+    if (sk === 'stop_loss') d = d < 0 ? 0 : d;
+    deltas[p.id] = d;
+  });
   deltas = applyStrategyCards(room, deltas);
   return deltas;
 }
+const HARD_MODS = [
+  { name: '市场恐慌', delta: -5, type: 'all' },
+  { name: '意外之财', delta: 5, type: 'all' },
+  { name: '奖励波动', delta: 3, type: 'all' },
+  { name: '成本上升', delta: -3, type: 'all' },
+  { name: '全城丰收', delta: 4, type: 'all' },
+  { name: '寒冬将至', delta: -4, type: 'all' },
+  { name: '黑市交易', type: 'random_plus', value: 10 },
+  { name: '幸运儿', type: 'random_plus', value: 8 },
+  { name: '意外补贴', type: 'lowest_plus', value: 12 },
+  { name: '劫富济贫', type: 'redistribute', rich: -8, poor: 8 }
+];
+
 function applyHardModifier(room, result) {
   if (room.difficulty !== 'hard') return result;
-  const mods = [
-    { name: '市场恐慌', delta: -5, type: 'all' },
-    { name: '意外之财', delta: 5, type: 'all' },
-    { name: '奖励波动', delta: 3, type: 'all' },
-    { name: '成本上升', delta: -3, type: 'all' },
-    { name: '全城丰收', delta: 4, type: 'all' },
-    { name: '寒冬将至', delta: -4, type: 'all' },
-    { name: '黑市交易', type: 'random_plus', value: 10 },
-    { name: '幸运儿', type: 'random_plus', value: 8 },
-    { name: '意外补贴', type: 'lowest_plus', value: 12 },
-    { name: '劫富济贫', type: 'redistribute', rich: -8, poor: 8 }
-  ];
-  const mod = mods[Math.floor(Math.random() * mods.length)];
+  if (!room.currentHardMod) {
+    room.currentHardMod = HARD_MODS[Math.floor(Math.random() * HARD_MODS.length)];
+  }
+  const mod = room.currentHardMod;
   const eligible = room.players.filter(p => {
     const trait = room.traits && room.traits[p.id];
-    const isSafe = trait && trait.id === 'safe_harbor';
-    const isLocked = room.activeSkillEffects && room.activeSkillEffects[p.id] === 'steady_gain';
-    return !isSafe && !isLocked;
+    const isLocked = room.classEffects && room.classEffects[p.id] === 'steady_gain';
+    return !isLocked;
   });
+  const destinyId = room.destinyPlayer || null;
   if (mod.type === 'all') {
     eligible.forEach(p => {
-      result.deltas[p.id] = (result.deltas[p.id] || 0) + mod.delta;
+      let amount = mod.delta;
+      if (p.id === destinyId && amount < 0) amount = Math.abs(amount);
+      result.deltas[p.id] = (result.deltas[p.id] || 0) + amount;
+      if (amount < 0 && room.luckInsurance && room.luckInsurance[p.id]) {
+        room.luckInsuranceHit = room.luckInsuranceHit || {};
+        room.luckInsuranceHit[p.id] = true;
+      }
     });
     result.detail += `\n【困难随机事件】${mod.name}：全员${mod.delta > 0 ? '+' : ''}${mod.delta}分`;
   } else if (mod.type === 'random_plus') {
-    if (eligible.length) {
-      const target = eligible[Math.floor(Math.random() * eligible.length)];
+    let candidates = eligible.slice();
+    if (destinyId && candidates.find(x => x.id === destinyId)) {
+      candidates = candidates.filter(x => x.id === destinyId);
+    }
+    if (candidates.length) {
+      const target = candidates[Math.floor(Math.random() * candidates.length)];
       result.deltas[target.id] = (result.deltas[target.id] || 0) + mod.value;
       result.detail += `\n【困难随机事件】${mod.name}：${target.name} +${mod.value}分`;
     }
@@ -1588,6 +1714,11 @@ function resolveNormal(room) {
   const baseDeltas = Object.assign({}, result.deltas);
   const baseDetail = result.detail || '';
   result.deltas = applyIdentityToDeltas(room, result.deltas);
+  if (room.luckInsuranceHit) {
+    Object.keys(room.luckInsuranceHit).forEach(pid => {
+      result.deltas[pid] = (result.deltas[pid] || 0) + 5;
+    });
+  }
   const actualDeltas = Object.assign({}, result.deltas);
   room.players.forEach(p => {
     p.score += actualDeltas[p.id] || 0;
@@ -1767,81 +1898,128 @@ function handleMessage(ws, msg) {
     case 'useSkill': {
       if (!room || room.difficulty !== 'hard' || !room.traits) return;
       const player = room.players.find(p => p.id === ws.playerId);
-      if (!['reading','discussion'].includes(room.phase)) return;
+      if (!['reading','discussion','intelligence'].includes(room.phase)) return;
       if (!player) return;
       const trait = room.traits[player.id];
-      if (!trait || !trait.skill) return;
-      if (trait.id === 'cleaner' && !(room.publishCountThisRound > 0)) {
-        send(ws, { type: 'error', message: '请先有人公布信息后才能发动情报技能' });
+      if (!trait || !Array.isArray(trait.skills)) return;
+      if (room.usedClassSkills && room.usedClassSkills[player.id]) return;
+      if (room.suppressed && room.suppressed[player.id]) {
+        send(ws, { type: 'error', message: '你本阶段被压制，不能使用主动技能' });
         return;
       }
-      if (room.usedSkills[player.id] || room.usedInfoSkills[player.id]) return;
-      const isInfoSkill = ['info_broker','censor','cleaner','spy'].includes(trait.id);
-      if (isInfoSkill) room.usedInfoSkills[player.id] = true; else room.usedSkills[player.id] = true;
-      room.activeSkillEffects[player.id] = trait.skill.id;
-      if (trait.id === 'strategist') {
-        const others = room.players.filter(x => x.id !== player.id);
-        if (others.length) {
-          room.activeSkillTargets[player.id] = others[Math.floor(Math.random() * others.length)].id;
+      const skill = trait.skills.find(s => s.id === msg.skillId);
+      if (!skill) return;
+      if (trait.classType === 'intel' && room.phase !== 'intelligence') {
+        send(ws, { type: 'error', message: '情报技能需要在情报阶段使用' });
+        return;
+      }
+      let target = null;
+      if (skill.target === 'player') {
+        target = room.players.find(p => p.id === msg.targetId);
+        if (!target || target.id === player.id) {
+          send(ws, { type: 'error', message: '请选择有效目标玩家' });
+          return;
         }
       }
-      if (trait.id === 'info_broker') {
-        const others = room.players.filter(x => x.id !== player.id);
-        if (others.length) {
-          const target = others[Math.floor(Math.random() * others.length)];
-          const cats = ['identity', 'skill', 'score'];
+      if (skill.id === 'reroll' && (room.luckPoints[player.id] || 0) < 1) {
+        send(ws, { type: 'error', message: '好运点不足' }); return;
+      }
+      if (skill.id === 'destiny' && (room.luckPoints[player.id] || 0) < 2) {
+        send(ws, { type: 'error', message: '好运点不足，天选需要2点' }); return;
+      }
+      if (skill.id === 'transfer_luck' && (room.luckPoints[player.id] || 0) < 1) {
+        send(ws, { type: 'error', message: '好运点不足' }); return;
+      }
+      room.usedClassSkills[player.id] = true;
+      room.classEffects[player.id] = skill.id;
+      room.classTargets[player.id] = target ? target.id : null;
+
+      if (skill.id === 'suppress' && target) {
+        room.suppressed[target.id] = true;
+        broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 本阶段被压制，不能使用主动技能` });
+      }
+      if (skill.id === 'peek' && target) {
+        const targetTrait = room.traits[target.id];
+        if (targetTrait) sendTo(room, player.id, { type: 'spyInfo', name: target.name, trait: targetTrait });
+      }
+      if (skill.id === 'censor' && target) {
+        room.blockedPublish[target.id] = true;
+        broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 本轮被禁止发布公开信息` });
+      }
+      if (skill.id === 'cleanse' && target) {
+        const targetTrait = room.traits[target.id];
+        if (targetTrait && targetTrait.classType === 'intel') {
+          broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 是情报者，同行免疫，无法清除` });
+        } else if (room.protectedInfo && room.protectedInfo[target.id]) {
+          broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 的待公开信息已被公证保护，无法清除` });
+        } else {
+          const entry = room.pendingInfo[target.id];
+          if (entry) {
+            const cats = ['identity','skill','score'].filter(c => entry[c]);
+            if (cats.length) {
+              const cat = cats[Math.floor(Math.random() * cats.length)];
+              delete entry[cat];
+              broadcast(room, { type: 'chat', name: '系统', text: `系统删除了一条关于 ${target.name} 的待公开信息` });
+              broadcastPendingInfo(room);
+            }
+          }
+        }
+      }
+      if (skill.id === 'notarize' && target) {
+        room.protectedInfo[target.id] = true;
+        broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 的待公开信息已被公证保护` });
+        broadcastPendingInfo(room);
+      }
+      if (skill.id === 'forge' && target) {
+        const targetTrait = room.traits[target.id];
+        if (targetTrait && targetTrait.classType === 'intel') {
+          broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 是情报者，同行免疫，无法伪造` });
+        } else if (room.protectedInfo && room.protectedInfo[target.id]) {
+          broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 的待公开信息已被公证保护，无法伪造` });
+        } else {
+          const cats = ['identity','skill','score'];
           const cat = cats[Math.floor(Math.random() * cats.length)];
-          if (!room.publicInfo[target.id]) room.publicInfo[target.id] = {};
+          if (!room.pendingInfo[target.id]) room.pendingInfo[target.id] = { identity: null, skill: null, score: null };
           let value = '';
           if (cat === 'identity') {
-            const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
-            const fakeTrait = fakeTraits[Math.floor(Math.random() * fakeTraits.length)] || TRAITS[0];
-            value = fakeTrait.name;
-            room.publicInfo[target.id].identity = { name: value, desc: fakeTrait.desc, forged: true, modified: true };
+            const fake = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+            value = fake.name;
+            room.pendingInfo[target.id].identity = { value: fake.name, desc: fake.desc, forged: true, modified: true };
           } else if (cat === 'skill') {
-            const fakeTraits = TRAITS.filter(t => t.id !== trait.id);
-            const fakeTrait = fakeTraits[Math.floor(Math.random() * fakeTraits.length)] || TRAITS[0];
-            value = fakeTrait.skill.name;
-            room.publicInfo[target.id].skill = { name: value, desc: fakeTrait.skill.desc, forged: true, modified: true };
+            const fake = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+            value = fake.skills[0] ? fake.skills[0].name : '未知技能';
+            room.pendingInfo[target.id].skill = { value, desc: fake.desc, forged: true, modified: true };
           } else {
             value = Math.floor(Math.random() * 200);
-            room.publicInfo[target.id].score = value;
+            room.pendingInfo[target.id].score = { value, forged: true, modified: true };
           }
-          broadcast(room, { type: 'publicInfo', playerId: target.id, name: target.name, category: cat, value, modified: true });
+          broadcast(room, { type: 'chat', name: '系统', text: `一条关于 ${target.name} 的伪造情报被提交` });
+          broadcastPendingInfo(room);
         }
       }
-      if (trait.id === 'censor') {
-        const others = room.players.filter(x => x.id !== player.id);
-        if (others.length) {
-          const target = others[Math.floor(Math.random() * others.length)];
-          room.blockedPublish = room.blockedPublish || {};
-          room.blockedPublish[target.id] = true;
-          broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 本轮被禁止发布公开信息` });
-        }
+      if (skill.id === 'transfer_luck' && target) {
+        room.luckPoints[player.id] = (room.luckPoints[player.id] || 0) - 1;
+        room.luckPoints[target.id] = (room.luckPoints[target.id] || 0) + 1;
+        sendTo(room, player.id, { type: 'luckInfo', points: room.luckPoints[player.id] });
+        sendTo(room, target.id, { type: 'luckInfo', points: room.luckPoints[target.id] });
       }
-      if (trait.id === 'cleaner') {
-        const others = room.players.filter(x => x.id !== player.id);
-        if (others.length) {
-          const target = others[Math.floor(Math.random() * others.length)];
-          const cats = ['identity', 'skill', 'score'];
-          const cat = cats[Math.floor(Math.random() * cats.length)];
-          if (room.publicInfo[target.id]) {
-            room.publicInfo[target.id][cat] = null;
-            broadcast(room, { type: 'publicInfoDelete', playerId: target.id, name: target.name, category: cat });
-          }
-        }
+      if (skill.id === 'reroll') {
+        room.luckPoints[player.id] = (room.luckPoints[player.id] || 0) - 1;
+        room.currentHardMod = HARD_MODS[Math.floor(Math.random() * HARD_MODS.length)];
+        sendTo(room, player.id, { type: 'luckInfo', points: room.luckPoints[player.id] });
+        broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 改写了本轮的随机事件` });
       }
-      if (trait.id === 'spy') {
-        const others = room.players.filter(x => x.id !== player.id);
-        if (others.length) {
-          const target = others[Math.floor(Math.random() * others.length)];
-          const targetTrait = room.traits[target.id];
-          if (targetTrait) {
-            sendTo(room, player.id, { type: 'spyInfo', name: target.name, trait: targetTrait });
-          }
-        }
+      if (skill.id === 'destiny') {
+        room.luckPoints[player.id] = (room.luckPoints[player.id] || 0) - 2;
+        room.destinyPlayer = player.id;
+        sendTo(room, player.id, { type: 'luckInfo', points: room.luckPoints[player.id] });
+        broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 获得了天选庇佑` });
       }
-      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 发动了主动技能` });
+      if (skill.id === 'luck_insurance') {
+        room.luckInsurance[player.id] = true;
+        broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 购买了本轮好运保险` });
+      }
+      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 发动了主动技能：${skill.name}` });
       break;
     }
     case 'publishInfo': {
@@ -1864,21 +2042,21 @@ function handleMessage(ws, msg) {
       }
       room.infoActions[player.id] = used + 1;
       room.publishCountThisRound = (room.publishCountThisRound || 0) + 1;
-      if (!room.publicInfo[player.id]) room.publicInfo[player.id] = {};
+      if (!room.pendingInfo[player.id]) room.pendingInfo[player.id] = { identity: null, skill: null, score: null };
       const trait = room.traits[player.id];
       if (category === 'identity' && trait) {
-        room.publicInfo[player.id].identity = { name: trait.name, desc: trait.desc };
-        broadcast(room, { type: 'publicInfo', playerId: player.id, name: player.name, category: 'identity', value: trait.name });
-      } else if (category === 'skill' && trait && trait.skill) {
-        room.publicInfo[player.id].skill = { name: trait.skill.name, desc: trait.skill.desc };
-        broadcast(room, { type: 'publicInfo', playerId: player.id, name: player.name, category: 'skill', value: trait.skill.name });
+        room.pendingInfo[player.id].identity = { value: trait.name, desc: trait.desc, pending: true };
+      } else if (category === 'skill' && trait && Array.isArray(trait.skills)) {
+        const skillNames = trait.skills.map(x => x.name).join('、');
+        room.pendingInfo[player.id].skill = { value: skillNames, desc: trait.passive || trait.desc, pending: true };
       } else if (category === 'score') {
-        room.publicInfo[player.id].score = player.score;
-        broadcast(room, { type: 'publicInfo', playerId: player.id, name: player.name, category: 'score', value: player.score });
+        room.pendingInfo[player.id].score = { value: player.score, pending: true };
       } else {
         send(ws, { type: 'error', message: '当前没有可公布的信息' });
         return;
       }
+      broadcastPendingInfo(room);
+      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 提交了一条待公开信息` });
       break;
     }
     case 'revealMyInfo': {
@@ -1887,16 +2065,17 @@ function handleMessage(ws, msg) {
       if (!player) return;
       const trait = room.traits[player.id];
       const card = room.selectedCards[player.id];
-      const info = {
-        id: player.id,
-        name: player.name,
-        trait: trait ? { id: trait.id, name: trait.name, desc: trait.desc } : null,
-        skill: trait && trait.skill ? { id: trait.skill.id, name: trait.skill.name, desc: trait.skill.desc } : null,
-        card: card ? { id: card.id, name: card.name, desc: card.desc } : null,
-        score: player.score
-      };
-      room.revealedInfo[player.id] = info;
-      broadcast(room, { type: 'publicInfo', info });
+      if (!room.pendingInfo[player.id]) room.pendingInfo[player.id] = { identity: null, skill: null, score: null };
+      if (trait) {
+        room.pendingInfo[player.id].identity = { value: trait.name, desc: trait.desc, pending: true };
+        if (Array.isArray(trait.skills) && trait.skills.length) {
+          room.pendingInfo[player.id].skill = { value: trait.skills.map(x => x.name).join('、'), desc: trait.passive || '', pending: true };
+        }
+      }
+      room.pendingInfo[player.id].score = { value: player.score, pending: true };
+      room.revealedInfo[player.id] = { id: player.id, name: player.name, trait: trait ? { id: trait.id, name: trait.name, desc: trait.desc } : null, card: card ? { id: card.id, name: card.name, desc: card.desc } : null, score: player.score };
+      broadcastPendingInfo(room);
+      broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 公开了自己的所有信息（待最终公布）` });
       break;
     }
     case 'selectCard': {
@@ -1927,6 +2106,8 @@ function handleMessage(ws, msg) {
           } else {
             startChoice(room);
           }
+        } else if (room.phase === 'intelligence') {
+          endIntelligencePhase(room);
         } else if (room.phase === 'choosing') {
           broadcast(room, { type: 'choiceOpen', event: publicEvent(room.currentEvent), players: publicPlayers(room) });
         } else if (room.phase === 'repeat_choosing' && room.repeat) {
