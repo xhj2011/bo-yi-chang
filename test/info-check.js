@@ -17,7 +17,14 @@ const { chromium } = require('playwright');
   await page.click('button:has-text("开始游戏")');
   await page.waitForSelector('text=身份选择阶段');
   await page.locator('#gameBody .action-card').first().click();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(400);
+  const skillCards = page.locator('#gameBody .action-card');
+  await skillCards.nth(0).click();
+  await skillCards.nth(1).click();
+  await page.waitForTimeout(200);
+  const confirmBtn = page.locator('button:has-text("确认主动技能")');
+  if (await confirmBtn.count()) await confirmBtn.first().click();
+  await page.waitForTimeout(800);
 
   // 找公布身份按钮
   const pubBtn = page.locator('button:has-text("公布身份")');

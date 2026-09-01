@@ -678,6 +678,8 @@ let readingInfo = { read: 0, total: 0 };
 let selectedSkill = null;
 let pendingInfo = null;
 let pendingInfoCount = 0;
+let chosenSkillIds = [];
+let skillsConfirmed = false;
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -780,6 +782,8 @@ function handle(msg) {
       selectedSkill = null;
       pendingInfo = null;
       pendingInfoCount = 0;
+      chosenSkillIds = [];
+      skillsConfirmed = false;
       window._traits = msg.traits || [];
       window._traitProgress = { done: 0, total: (msg.players || []).length };
       document.getElementById('lobby').classList.add('hidden');
@@ -867,6 +871,12 @@ function handle(msg) {
     }
     case 'cardSelected': {
       selectedCard = msg.card || null;
+      renderGame();
+      break;
+    }
+    case 'skillsConfirmed': {
+      skillsConfirmed = true;
+      chosenSkillIds = msg.skills || [];
       renderGame();
       break;
     }
@@ -1072,8 +1082,19 @@ if (phase === 'trait_select') {
     const progress = window._traitProgress || { done: 0, total: 0 };
     html += `<div class="phase">身份选择阶段 · 已选择 ${progress.done}/${progress.total}</div>
       <p>请选择你的隐藏身份，只有你自己知道。</p>`;
-    if (myTrait) {
+    if (myTrait && !skillsConfirmed) {
+      html += `<p class="link">你已选择：${escapeHtml(myTrait.name)}（被动：${escapeHtml(myTrait.passive || '')}）</p>
+        <div class="phase">请选择 2~3 个主动技能</div>
+        <div class="actions">${(myTrait.skills || []).map(s => {
+          const selected = chosenSkillIds.includes(s.id);
+          return `<div class="action-card" onclick="toggleSkill('${s.id}')" style="${selected ? 'border-color:#f6d67a;background:rgba(150,100,30,.55);' : ''}">${selected ? '✅ ' : '⚡ '}${escapeHtml(s.name)}<br><small style="font-size:11px;">${escapeHtml(s.desc)}</small></div>`;
+        }).join('')}</div>
+        <p class="link">已选择 ${chosenSkillIds.length} 个（2~3 个）</p>
+        <button onclick="confirmSkills()" ${chosenSkillIds.length < 2 ? 'disabled style="opacity:.5;"' : ''}>确认主动技能</button>`;
+    } else if (myTrait && skillsConfirmed) {
+      const chosen = (myTrait.skills || []).filter(s => chosenSkillIds.includes(s.id));
       html += `<p class="link">你已选择：${escapeHtml(myTrait.name)}</p>
+        <p class="link">已确认技能：${chosen.map(s => escapeHtml(s.name)).join('、')}</p>
         <p class="link">等待其他玩家选择…</p>`;
     } else {
       html += `<div class="actions">${traits.map(t => `<div class="action-card" onclick="selectTrait('${t.id}')">${escapeHtml(t.name)}<br><small style="font-size:12px;">${escapeHtml(t.desc)}</small><br><small style="font-size:11px;color:#f6d67a;">${(t.skills || []).map(x => escapeHtml(x.name)).join(' / ')}</small></div>`).join('')}</div>`;
@@ -1308,6 +1329,27 @@ function useSkillNow(skillId, targetId) {
   if (!myTrait || mySkillUsed) return;
   selectedSkill = null;
   send({ type: 'useSkill', skillId, targetId });
+  renderGame();
+}
+function toggleSkill(skillId) {
+  if (skillsConfirmed) return;
+  if (chosenSkillIds.includes(skillId)) {
+    chosenSkillIds = chosenSkillIds.filter(id => id !== skillId);
+  } else {
+    if (chosenSkillIds.length >= 3) {
+      alert('最多选择3个主动技能');
+      return;
+    }
+    chosenSkillIds.push(skillId);
+  }
+  renderGame();
+}
+function confirmSkills() {
+  if (chosenSkillIds.length < 2 || chosenSkillIds.length > 3) {
+    alert('请选择2~3个主动技能');
+    return;
+  }
+  send({ type: 'selectSkills', skills: chosenSkillIds });
   renderGame();
 }
 function selectTrait(id) {

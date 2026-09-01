@@ -736,9 +736,16 @@ function checkReadingComplete(room) {
 
 function checkTraitSelection(room) {
   if (room.phase !== 'trait_select') return;
-  if (room.players.every(p => room.traits[p.id])) {
-    startRound(room);
-  }
+  if (!room.players.every(p => room.traits[p.id])) return;
+  if (!room.players.every(p => room.selectedSkillIds && room.selectedSkillIds[p.id] && room.selectedSkillIds[p.id].length >= 2)) return;
+  room.players.forEach(p => {
+    const t = room.traits[p.id];
+    const ids = room.selectedSkillIds[p.id];
+    if (t && Array.isArray(t.skills) && ids) {
+      room.traits[p.id] = Object.assign({}, t, { skills: t.skills.filter(s => ids.includes(s.id)) });
+    }
+  });
+  startRound(room);
 }
 function assignBotChoices(room) {
   const actions = room.currentEvent.actions || [];
@@ -1920,6 +1927,7 @@ function handleMessage(ws, msg) {
   room.revealedInfo = {};
   room.publicInfo = {};
   room.infoActions = {};
+  room.selectedSkillIds = {};
           room.activeSkillEffects = {};
   room.activeSkillTargets = {};
   room.blockedPublish = {};
@@ -1928,7 +1936,10 @@ function handleMessage(ws, msg) {
           broadcast(room, { type: 'traitSelect', traits: TRAITS, players: publicPlayers(room) });
           room.players.forEach(p => {
             if (p.isBot) {
-              room.traits[p.id] = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+              const botTrait = TRAITS[Math.floor(Math.random() * TRAITS.length)];
+              room.traits[p.id] = botTrait;
+              const allIds = botTrait.skills.map(x => x.id);
+              room.selectedSkillIds[p.id] = shuffle(allIds).slice(0, Math.min(3, allIds.length));
             }
           });
           broadcast(room, { type: 'traitProgress', done: Object.keys(room.traits).length, total: room.players.length });
@@ -1954,6 +1965,24 @@ function handleMessage(ws, msg) {
       if (!trait) return;
       room.traits[player.id] = trait;
       sendTo(room, player.id, { type: 'trait', trait });
+      broadcast(room, { type: 'traitProgress', done: Object.keys(room.traits).length, total: room.players.length });
+      checkTraitSelection(room);
+      break;
+    }
+    case 'selectSkills': {
+      if (!room || room.phase !== 'trait_select') return;
+      const player = room.players.find(p => p.id === ws.playerId);
+      if (!player) return;
+      const trait = room.traits[player.id];
+      if (!trait || !Array.isArray(trait.skills)) return;
+      const ids = Array.isArray(msg.skills) ? msg.skills.slice(0, 3) : [];
+      const valid = trait.skills.filter(s => ids.includes(s.id)).map(s => s.id);
+      if (valid.length < 2) {
+        send(ws, { type: 'error', message: '请至少选择2个主动技能' });
+        return;
+      }
+      room.selectedSkillIds[player.id] = valid;
+      sendTo(room, player.id, { type: 'skillsConfirmed', skills: valid });
       broadcast(room, { type: 'traitProgress', done: Object.keys(room.traits).length, total: room.players.length });
       checkTraitSelection(room);
       break;

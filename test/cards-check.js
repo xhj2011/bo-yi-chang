@@ -41,6 +41,13 @@ fs.mkdirSync(outDir, { recursive: true });
   if (await firstIdentity.count()) {
     await firstIdentity.click();
   }
+  await page.waitForTimeout(400);
+  const skillCards = page.locator('#gameBody .action-card');
+  await skillCards.nth(0).click();
+  await skillCards.nth(1).click();
+  await page.waitForTimeout(200);
+  const confirmBtn = page.locator('button:has-text("确认主动技能")');
+  if (await confirmBtn.count()) await confirmBtn.first().click();
   await page.waitForTimeout(800);
 
   // 等待阅读阶段中策略卡出现
