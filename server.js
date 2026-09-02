@@ -30,13 +30,13 @@ const TRAITS = [
   },
   {
     id: 'lucky', name: '幸运者', classType: 'lucky',
-    desc: '好运点：每局3点，关键随机效果时可消耗，每轮最多用1点。',
-    passive: '好运点',
+    desc: '气运加身：你受到随机负面效果伤害减少50%；获得随机正面效果时额外+2。',
+    passive: '气运加身',
     skills: [
-      { id: 'reroll', name: '改命', desc: '消耗1好运点，重抽本轮全局随机事件且不会更差', target: 'self' },
-      { id: 'destiny', name: '天选', desc: '消耗2好运点，本轮随机事件对你必定有利', target: 'self' },
-      { id: 'transfer_luck', name: '好运转移', desc: '把自己1个好运点送给一名玩家', target: 'player' },
-      { id: 'luck_insurance', name: '好运保险', desc: '本轮若受到负面随机效果，回合结束返还+5', target: 'self' }
+      { id: 'luck_bonus', name: '好运降临', desc: '本轮额外+8分', target: 'self' },
+      { id: 'avoid_bad', name: '避霉运', desc: '本轮免疫一次负面随机效果', target: 'self' },
+      { id: 'lucky_gamble', name: '豪赌', desc: '50% +20 / 50% -5', target: 'self' },
+      { id: 'lucky_destiny', name: '天选', desc: '下一轮全局随机事件必定对你有利', target: 'self' }
     ]
   },
   {
@@ -657,6 +657,12 @@ function startRound(room) {
   room.intelligenceTimer = null;
   room.currentHardMod = null;
   room.destinyPlayer = null;
+  if (room.nextRoundLuckyDestiny) {
+    const luckyIds = Object.keys(room.nextRoundLuckyDestiny).filter(id => room.nextRoundLuckyDestiny[id]);
+    if (luckyIds.length) room.destinyPlayer = luckyIds[0];
+  }
+  room.nextRoundLuckyDestiny = {};
+  room.avoidBad = {};
   room.luckInsurance = {};
   room.luckInsuranceHit = {};
   room.suppressed = {};
@@ -1708,6 +1714,8 @@ function applyIdentityToDeltas(room, deltas) {
     let d = deltas[p.id] || 0;
     if (sk === 'allout') d = d > 0 ? Math.round(d * 1.5) : d;
     if (sk === 'stop_loss') d = d < 0 ? 0 : d;
+    if (sk === 'luck_bonus') d += 8;
+    if (sk === 'lucky_gamble') d += (Math.random() < 0.5 ? 20 : -5);
     deltas[p.id] = d;
   });
   deltas = applyStrategyCards(room, deltas);
@@ -1738,10 +1746,14 @@ function applyHardModifier(room, result) {
     return !isLocked;
   });
   const destinyId = room.destinyPlayer || null;
+  const isLucky = pid => { const t = room.traits && room.traits[pid]; return !!(t && t.classType === 'lucky'); };
   if (mod.type === 'all') {
     eligible.forEach(p => {
       let amount = mod.delta;
       if (p.id === destinyId && amount < 0) amount = Math.abs(amount);
+      if (amount < 0 && isLucky(p.id)) amount = Math.round(amount * 0.5);
+      if (amount > 0 && isLucky(p.id)) amount += 2;
+      if (amount < 0 && room.avoidBad && room.avoidBad[p.id]) amount = 0;
       result.deltas[p.id] = (result.deltas[p.id] || 0) + amount;
       if (amount < 0 && room.luckInsurance && room.luckInsurance[p.id]) {
         room.luckInsuranceHit = room.luckInsuranceHit || {};
@@ -1756,21 +1768,28 @@ function applyHardModifier(room, result) {
     }
     if (candidates.length) {
       const target = candidates[Math.floor(Math.random() * candidates.length)];
-      result.deltas[target.id] = (result.deltas[target.id] || 0) + mod.value;
-      result.detail += `\n【困难随机事件】${mod.name}：${target.name} +${mod.value}分`;
+      const value = mod.value + (isLucky(target.id) ? 2 : 0);
+      result.deltas[target.id] = (result.deltas[target.id] || 0) + value;
+      result.detail += `\n【困难随机事件】${mod.name}：${target.name} +${value}分`;
     }
   } else if (mod.type === 'lowest_plus') {
     if (eligible.length) {
       const target = eligible.reduce((a, b) => a.score <= b.score ? a : b);
-      result.deltas[target.id] = (result.deltas[target.id] || 0) + mod.value;
-      result.detail += `\n【困难随机事件】${mod.name}：${target.name} +${mod.value}分`;
+      const value = mod.value + (isLucky(target.id) ? 2 : 0);
+      result.deltas[target.id] = (result.deltas[target.id] || 0) + value;
+      result.detail += `\n【困难随机事件】${mod.name}：${target.name} +${value}分`;
     }
   } else if (mod.type === 'redistribute' && eligible.length >= 2) {
     const rich = eligible.reduce((a, b) => a.score >= b.score ? a : b);
     const poor = eligible.reduce((a, b) => a.score <= b.score ? a : b);
-    result.deltas[rich.id] = (result.deltas[rich.id] || 0) + mod.rich;
-    result.deltas[poor.id] = (result.deltas[poor.id] || 0) + mod.poor;
-    result.detail += `\n【困难随机事件】${mod.name}：${rich.name}-8，${poor.name}+8`;
+    let richDelta = mod.rich;
+    let poorDelta = mod.poor;
+    if (isLucky(rich.id)) richDelta = Math.round(richDelta * 0.5);
+    if (isLucky(poor.id)) poorDelta += 2;
+    if (room.avoidBad && room.avoidBad[rich.id] && richDelta < 0) richDelta = 0;
+    result.deltas[rich.id] = (result.deltas[rich.id] || 0) + richDelta;
+    result.deltas[poor.id] = (result.deltas[poor.id] || 0) + poorDelta;
+    result.detail += `\n【困难随机事件】${mod.name}：${rich.name}${richDelta}，${poor.name}+${poorDelta}`;
   }
   return result;
 }
@@ -2026,6 +2045,14 @@ function handleMessage(ws, msg) {
       room.classEffects[player.id] = skill.id;
       room.classTargets[player.id] = target ? target.id : null;
 
+      if (skill.id === 'avoid_bad') {
+        room.avoidBad[player.id] = true;
+        broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 获得避霉运护盾` });
+      }
+      if (skill.id === 'lucky_destiny') {
+        room.nextRoundLuckyDestiny[player.id] = true;
+        broadcast(room, { type: 'chat', name: '系统', text: `${player.name} 将在下一轮获得天选庇佑` });
+      }
       if (skill.id === 'suppress' && target) {
         room.suppressed[target.id] = true;
         broadcast(room, { type: 'chat', name: '系统', text: `${target.name} 本阶段被压制，不能使用主动技能` });
